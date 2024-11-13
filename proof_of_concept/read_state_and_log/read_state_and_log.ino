@@ -7,6 +7,10 @@
 #define SW_COM 2
 #define SW_DOWN 3
 
+#define KEY_UP 0b11
+#define KEY_FLOAT 0b01
+#define KEY_DOWN 0b00
+
 void setup() {
   Serial.begin(115200);
 
@@ -22,12 +26,6 @@ void setup() {
   pinMode(ADDRESS_2, OUTPUT);
 }
 
- 
-
-#define KEY_UP 0b11
-#define KEY_FLOAT 0b01
-#define KEY_DOWN 0b00
-
 // the loop function runs over and over again forever
 void loop() {
   //enable multiplexers
@@ -35,22 +33,20 @@ void loop() {
 
   Serial.println("");
 
-  for(int i  = 0; i<6; i++){
+  for(unsigned char i  = 0; i<6; i++){
     int val = readKey(i);
     Serial.print(val == KEY_UP ? " UP " : val == KEY_FLOAT ? "MID " : val == KEY_DOWN ? "DOWN" : "????");
-    //Serial.print(val, BIN);
     Serial.print(" ");
   }
 
-  //delay(50);
 }
 
 //keyindex 0...5
-int readKey(int keyIndex){
+int readKey(unsigned char keyIndex){
   //set address
-  digitalWrite(ADDRESS_0, keyIndex & 0b001);
-  digitalWrite(ADDRESS_1, keyIndex & 0b010);
-  digitalWrite(ADDRESS_2, keyIndex & 0b100);
+  digitalWrite(ADDRESS_0, keyIndex & 0x01u);
+  digitalWrite(ADDRESS_1, (keyIndex & 0x02u) >> 1);
+  digitalWrite(ADDRESS_2, (keyIndex & 0x04u) >> 2);
 
   //read
   int com_val = digitalRead(SW_COM);
