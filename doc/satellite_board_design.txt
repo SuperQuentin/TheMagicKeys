@@ -1,0 +1,57 @@
+
+**** .... ****
+U1 is the voltage between key 1 pin (COM pin) and ground.
+U2 is the voltage between key 2 pin and ground (NC pin).
+
+D1 and D2 are the corresponding digital signals
+
+Possible values:
+U1   U2   D1 D2   Comment
+5V   5V   1  1    UP Position. Default Position. 
+0V   5V   1  0    Position between UP and DOWN.
+0.7V 0.7V 0  0    DOWN position.
+
+**** Key groups, number of MUX and number of GPIO ****
+Considering the key layout, we decide to group the keys by 6 (2 green flat cables). We call this a key group.
+For 84 keys , we have 14 key groups. One satellite board will manage 1 or 2 key groups (2 or 4 green flat cables).
+For each key, 2 inputs must be read. Thus, for each key group 2 x 8 channels multiplexers will be needed.
+Note that each board can read 2 additional keys. This will be used to connect the 2 pedals and the additional key (we have 85 keys).
+
+On the Arduino, 23 GPIO are available. 
+We will use RX and TX for communication -> 21 GPIO are left.
+
+** Solution 1: Minimize the reading time. **
+3 outputs are used to address keys one by one in a key group.
+2 outputs are used to address key group1..7 or key group8..14
+14 inputs are used to read the state of key group1..7 or key group8..14 (7 keys read at once).
+Total: 19 GPIO
+
+**** Jumpers ****
+
+** J1 and J2 **
+J1 ON -> Board belong to key group1..7 
+J2 ON -> Board belong to key group8..14
+
+Possible configurations:
+J1   J2		Comment
+ON   OFF	key group1..7 
+OFF  ON		key group8..14
+
+** J3, J4, J5 and J6 ** 
+J3 ON -> MUX 1 I6 connected to additional key voltage U2 
+J4 ON -> MUX 1 I6 connected to ground.
+J5 ON -> MUX 2 I6 connected to additional key voltage U1 
+J6 ON -> MUX 2 I6 connected to ground.
+
+Possible configurations:
+J3  J4  J5  J6		Comment
+ON  OFF ON	OFF 	Additional key managed
+OFF ON	OFF ON		Additional key not managed
+
+**** Flat cable between boards ****
+Nb Wires	Comment
+19 			Addressing + Key state reading
+1			+5V
+1			GND
+
+We can use a 2 x 12 connector.
