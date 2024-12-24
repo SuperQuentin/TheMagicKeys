@@ -1,0 +1,14 @@
+**** TODO ****
+- Calculate voltage regulator current to provide.
+- Verify UART voltage levels.
+
+**** Calculate voltage regulator current to provide ****
+Satellite boards
+	7 x 14 Resitors 4.7 KOhms -> I = 98 x 5 / 4700 = 100 mA
+	7 x 2 MUX -> 14 mA
+	
+**** Arduino <-> Daisy Seed communication ****
+UART Arduino -> Voltage level = 5 V
+UART Daisy seed -> Voltage level = 3.3 V
+
+How to shift the voltage

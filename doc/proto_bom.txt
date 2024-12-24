@@ -1,0 +1,68 @@
+** A commander **
+- Main board
+- Multiplexers
+- Socles IC
+- Push button
+- Power supply
+- Resistors
+- Decoupling capacitors
+- Anti-bounce capacitors.
+- Proto board
+- Connectors
+
+** Exemple recherche MUX **
+	Digikey -> Très bon
+	Mouser -> Bon	
+	Lextronic -> Moyen
+	
+** Main board **
+ARDUINO NANO EVERY WITH HEADERS
+DigiKey Ref 1050-ABX00033-ND
+1 part
+
+** Multiplexers **
+CD74HCT251E 
+Digikey ref 296-2106-5-ND
+2 parts
+
+** IC socket **
+IC SOCKET, DIP, 16P 2.54MM PITCH
+DigiKey Ref 2057-ICS-316-T-ND
+4 parts
+
+** Push Button **
+SWITCH PUSH SPDT 0.4VA 20V
+DigiKey Ref EG5341-ND
+8 parts
+
+** Voltage regulator **
+IC REG LINEAR 5V 250MA TO92-3
+DigiKey Ref MCP1700-5002E/TO-ND
+
+** Resistors **
+RES ARRAY 8 RES 1K OHM 16DIP
+DigiKey Ref 4116R-1-102LF-ND
+
+RES ARRAY 8 RES 4.7K OHM 16DIP
+DigiKey Ref 4116R-1-472LF-ND
+
+** Capacitors **
+
+For IC 
+	CAP FILM 1000PF 10% 63VDC RADIAL
+	DigiKey Ref 495-2456-1-ND - Cut Tape (CT)
+
+For hardware anti-bounce:
+	To filter Tf = 1 ms bounces:
+		C = 0.1 microF
+		R = 100 kOhm
+	Delay is Td = 20 ms
+	
+
+** Connectors **	
+
+** Proto board **
+Pitch: 2.54 mm
+Board type: General purpose
+Série: Proto advantage 
+Circuit pattern: pad per hole

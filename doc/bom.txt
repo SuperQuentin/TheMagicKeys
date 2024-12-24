@@ -1,7 +1,0 @@
-** Flat ribbon female connector 24 pins **
-DigiKey Part Number: 2057-FCS-24-SG-ND
-Description: SOCKET FLAT CABLE IDC 24P 2.54MM
-
-** Male connector 24 pins **
-DigiKey Part Number: 2057-BHR-24-VUA-ND
-Description: CONN HEADER VERT 24POS 2.54MM

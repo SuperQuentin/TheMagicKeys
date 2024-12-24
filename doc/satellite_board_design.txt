@@ -1,5 +1,5 @@
 
-**** .... ****
+**** Notation ****
 U1 is the voltage between key 1 pin (COM pin) and ground.
 U2 is the voltage between key 2 pin and ground (NC pin).
 
@@ -47,6 +47,9 @@ Possible configurations:
 J3  J4  J5  J6		Comment
 ON  OFF ON	OFF 	Additional key managed
 OFF ON	OFF ON		Additional key not managed
+
+** J7..J21 **
+
 
 **** Flat cable between boards ****
 Nb Wires	Comment
