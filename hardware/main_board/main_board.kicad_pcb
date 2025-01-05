@@ -1015,7 +1015,7 @@
 	(footprint "Module:Arduino_Nano"
 		(layer "F.Cu")
 		(uuid "6777ef2e-e5ac-43d5-983e-78d3c1ad6b37")
-		(at 129.032 47.498)
+		(at 117.856 64.008)
 		(descr "Arduino Nano, http://www.mouser.com/pdfdocs/Gravitech_Arduino_Nano3_0.pdf")
 		(tags "Arduino Nano")
 		(property "Reference" "A1"
@@ -3932,11 +3932,11 @@
 	(footprint "Module:Electrosmith_Daisy_Seed"
 		(layer "F.Cu")
 		(uuid "c47f2740-0828-4872-a3fb-d27445749f84")
-		(at 96.52 62.484)
+		(at 80.518 51.054)
 		(descr "Embedded platform for audio applications. 96kHz / 24-bit audio hardware. 64MB of SDRAM for up to 10 minute long audio. ARM Cortex-M7 MCU, running at 480MHz. 31 total GPIO pins with configurable functionality. 12-bit Digital to Analog Converters (x2). SD card interfaces. PWM outputs. Serial Protocols for connecting external sensors and devices (SPI, UART, I2S, I2C). Dedicated VIN pin for power. Micro USB port, and additional USB pins for full OTG-support as host and device. https://static1.squarespace.com/static/58d03fdc1b10e3bf442567b8/t/6227e6236f02fb68d1577146/1646781988478/Daisy_Seed_datasheet_v1.0.3.pdf")
 		(tags "Electrosmith Daisy Seed Microcontroller Module ARM Cortex-M7 Audio Codec")
 		(property "Reference" "A2"
-			(at 7.62 -3.6 0)
+			(at 7.62 -3.6 360)
 			(layer "F.SilkS")
 			(uuid "3e2408ae-5662-4bc9-8efa-08cbc46a92d1")
 			(effects
@@ -3947,7 +3947,7 @@
 			)
 		)
 		(property "Value" "Electrosmith_Daisy_Seed_Rev4"
-			(at 7.62 51 0)
+			(at 7.62 51 360)
 			(layer "F.Fab")
 			(uuid "44cf4305-755f-4bb7-b41c-8f9d599b3475")
 			(effects
@@ -4242,7 +4242,7 @@
 			(uuid "3610e68a-004c-4739-98d3-9461d92c5600")
 		)
 		(fp_text user "${REFERENCE}"
-			(at 7.62 22 0)
+			(at 7.62 22 360)
 			(layer "F.Fab")
 			(uuid "f7fd2e97-44a8-4909-8f4d-4be2a08605a3")
 			(effects

@@ -20,16 +20,20 @@ void setup() {
 
   //out
   pinMode(OUTPUT_ENABLE, OUTPUT);
-  //pinMode(15, OUTPUT);
   pinMode(ADDRESS_0, OUTPUT);
   pinMode(ADDRESS_1, OUTPUT);
   pinMode(ADDRESS_2, OUTPUT);
+
+  // Initialize multiplexers
+  digitalWrite(OUTPUT_ENABLE, HIGH);
+  digitalWrite(ADDRESS_0, LOW); 
+  digitalWrite(ADDRESS_1, LOW);
+  digitalWrite(ADDRESS_2, LOW); 
+  digitalWrite(OUTPUT_ENABLE, LOW);
 }
 
 // the loop function runs over and over again forever
 void loop() {
-  //enable multiplexers
-  digitalWrite(OUTPUT_ENABLE, LOW);
 
   Serial.println("");
 

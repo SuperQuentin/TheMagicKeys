@@ -1,4 +1,4 @@
-24199694311269948
+24203168679160724
 4116R_1_102LF
 BO_4116R
 
@@ -2593,6 +2593,13 @@ CD74HCT251E
 DIP794W45P254L1969H508Q16
 
 
+0
+16
+16
+CD40109BE
+N16
+
+CD40109BE 
 0
 16
 16
@@ -56811,6 +56818,13 @@ One digit LED 7 segment SA39-11 SC39-11 SA39-12 SC39-12
 0
 10
 10
+EG1218
+SW_1218_EWI
+
+EG1218 
+0
+3
+3
 Ferrite_THT
 LairdTech_28C0236-0JW-10
 Ferrite, vertical, LairdTech 28C0236-0JW-10, https://assets.lairdtech.com/home/brandworld/files/28C0236-0JW-10.pdf, JW Miller core https://www.bourns.com/products/magnetic-products/j.w.-miller-through-hole-ferrite-beads-emi-filters
@@ -64063,6 +64077,13 @@ solder jumper open
 0
 5
 3
+L78M05CV
+TO-220_STM
+
+L78M05CV 
+0
+3
+3
 LED_SMD
 LED-APA102-2020
 http://www.led-color.com/upload/201604/APA102-2020%20SMD%20LED.pdf
@@ -65274,13 +65295,6 @@ Switch_Push_SPDT_800USP8P1A1M2RE
 0
 5
 5
-MCP1700_5002E_TO
-TO-92_MC_MCH
-
-MCP1700-5002E/TO 
-0
-3
-3
 Module
 A20_OLINUXINO_LIME2
 A20 Olinuxino LIME2, 1.2GHz, 512-1024MB RAM, Micro-SD, NAND or eMMC, 1000Mbit Ethernet
@@ -89921,6 +89935,13 @@ rotary encoder illuminated switch vertical
 0
 9
 8
+SJ3_35083C_TR
+SAMESKY_SJ3-35083C-TR
+
+
+0
+4
+4
 Sensor
 ASAIR_AM2302_P2.54mm_Lead2.75mm_TabDown
 Temperature and humidity module, http://akizukidenshi.com/download/ds/aosong/AM2302.pdf
@@ -98006,10 +98027,3 @@ Varistor VF
 0
 2
 2
-footprints
-SW_1218_EWI
-
-EG1218 
-0
-3
-3

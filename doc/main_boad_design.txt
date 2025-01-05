@@ -11,4 +11,39 @@ Satellite boards
 UART Arduino -> Voltage level = 5 V
 UART Daisy seed -> Voltage level = 3.3 V
 
-How to shift the voltage
+Message from Arduino
+D <i> <time> <eol>
+U <i> <eol>
+
+with:
+	<i>: 	The index of the key pressed. <i> = 0..5
+	<time>: The flight time of the key in milliseconds. <time>
+	<eol>  : End of line character.
+	
+Message examples:
+D 2 4348
+U 2
+
+**** Typical attack time ****
+
+** Switch proto **
+min=340 us.
+max=10000 us
+
+time 300 -> volume = 1
+time = 10000 -> volume = 0
+
+v = a.t + b
+
+1 = a.300 + b
+0 = a.1e4 + b
+
+b = -1e4.a
+
+1 = a.300 - 1e4.a
+1 = -9700 a
+
+a = -1.03e4
+b = 1.03
+
+v = -1.03e4 + 1.03
