@@ -1,4 +1,7 @@
-/* Program that sends info about the key pressed to Raspberry PI through USB*/
+/************************************************************************************************** 
+Program that sends info about the key pressed to Daisy Seed through serial line (and USB for 
+debug).
+**************************************************************************************************/
 
 //**** Constants ****
 #define OUTPUT_ENABLE 14
