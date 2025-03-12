@@ -2130,7 +2130,7 @@
 			)
 		)
 		(property "Footprint" "Module:Arduino_Nano"
-			(at 0 0 0)
+			(at 8.875 -18.375 0)
 			(unlocked yes)
 			(layer "F.Fab")
 			(hide yes)
@@ -2143,7 +2143,7 @@
 			)
 		)
 		(property "Datasheet" "https://content.arduino.cc/assets/NANOEveryV3.0_sch.pdf"
-			(at 0 0 0)
+			(at 10.5 -14.65 0)
 			(unlocked yes)
 			(layer "F.Fab")
 			(hide yes)
@@ -2156,7 +2156,7 @@
 			)
 		)
 		(property "Description" "Arduino Nano Every"
-			(at 0 0 0)
+			(at 8.175 -9.6 0)
 			(unlocked yes)
 			(layer "F.Fab")
 			(hide yes)
@@ -2254,8 +2254,8 @@
 			(uuid "254b15bd-53a9-4918-b1bc-abd554fc56e7")
 		)
 		(fp_line
-			(start 3.68 31.62)
-			(end 11.56 31.62)
+			(start 3.5 -4.03)
+			(end 11.38 -4.03)
 			(stroke
 				(width 0.12)
 				(type solid)
@@ -2264,8 +2264,8 @@
 			(uuid "e12964e8-1f99-4d88-b4b1-48ea2a23c65f")
 		)
 		(fp_line
-			(start 3.68 42.04)
-			(end 3.68 31.62)
+			(start 3.5 6.39)
+			(end 3.5 -4.03)
 			(stroke
 				(width 0.12)
 				(type solid)
@@ -2274,8 +2274,8 @@
 			(uuid "4345d092-cae1-467d-ae6a-fe47f6f7e956")
 		)
 		(fp_line
-			(start 11.56 31.62)
-			(end 11.56 42.04)
+			(start 11.38 -4.03)
+			(end 11.38 6.39)
 			(stroke
 				(width 0.12)
 				(type solid)
@@ -2284,8 +2284,8 @@
 			(uuid "051b5978-8f22-4a7f-a0bb-1c591775e152")
 		)
 		(fp_line
-			(start 11.56 42.04)
-			(end 3.68 42.04)
+			(start 11.38 6.39)
+			(end 3.5 6.39)
 			(stroke
 				(width 0.12)
 				(type solid)
@@ -2424,8 +2424,8 @@
 			(uuid "fbc69d12-ab41-4996-9bcb-d59a9d75cfa5")
 		)
 		(fp_line
-			(start 3.81 31.75)
-			(end 11.43 31.75)
+			(start 3.63 -3.9)
+			(end 11.25 -3.9)
 			(stroke
 				(width 0.1)
 				(type solid)
@@ -2434,8 +2434,8 @@
 			(uuid "d292f861-8588-4924-ac66-09d30d69dd40")
 		)
 		(fp_line
-			(start 3.81 41.91)
-			(end 3.81 31.75)
+			(start 3.63 6.26)
+			(end 3.63 -3.9)
 			(stroke
 				(width 0.1)
 				(type solid)
@@ -2444,8 +2444,8 @@
 			(uuid "de9c074a-1849-4f6a-a571-c7043673246c")
 		)
 		(fp_line
-			(start 11.43 31.75)
-			(end 11.43 41.91)
+			(start 11.25 -3.9)
+			(end 11.25 6.26)
 			(stroke
 				(width 0.1)
 				(type solid)
@@ -2454,8 +2454,8 @@
 			(uuid "afe7ef88-f285-47a7-9fbc-4badd74d021f")
 		)
 		(fp_line
-			(start 11.43 41.91)
-			(end 3.81 41.91)
+			(start 11.25 6.26)
+			(end 3.63 6.26)
 			(stroke
 				(width 0.1)
 				(type solid)
@@ -2484,7 +2484,7 @@
 			(uuid "6afa2a00-3154-4c4d-aab6-9984e5f6b67c")
 		)
 		(fp_text user "USB"
-			(at 7.62 35.56 0)
+			(at 7.44 -0.09 0)
 			(unlocked yes)
 			(layer "F.SilkS")
 			(uuid "29006718-d951-4abf-91f7-6939bdb8e22b")
@@ -2545,9 +2545,9 @@
 			(drill 1)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net 4 "GND")
-			(pinfunction "GND")
-			(pintype "power_in")
+			(net 50 "Net-(A2-A0)")
+			(pinfunction "A0")
+			(pintype "bidirectional")
 			(uuid "d9266c67-4f08-42e4-85ee-6c7eb70dd264")
 		)
 		(pad "5" thru_hole oval

@@ -2279,17 +2279,18 @@
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
-			(property "Reference" "A1"
-				(at 2.1941 -25.4 0)
+			(property "Reference" "A2"
+				(at -14.224 30.734 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
 					(justify left)
+					(hide yes)
 				)
 			)
 			(property "Value" "Arduino_Nano_Every"
-				(at 2.1941 -27.94 0)
+				(at -22.86 27.178 0)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -2298,7 +2299,7 @@
 				)
 			)
 			(property "Footprint" "Module:Arduino_Nano"
-				(at 0 0 0)
+				(at -0.254 42.672 0)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -2308,7 +2309,7 @@
 				)
 			)
 			(property "Datasheet" "https://content.arduino.cc/assets/NANOEveryV3.0_sch.pdf"
-				(at 0 0 0)
+				(at -0.254 38.354 0)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -2317,7 +2318,7 @@
 				)
 			)
 			(property "Description" "Arduino Nano Every"
-				(at 0 0 0)
+				(at -0.762 46.482 0)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -2447,7 +2448,7 @@
 						)
 					)
 				)
-				(pin passive line
+				(pin power_in line
 					(at 0 -25.4 90)
 					(length 2.54) hide
 					(name "GND"
@@ -2537,9 +2538,9 @@
 						)
 					)
 				)
-				(pin passive line
+				(pin power_in line
 					(at -3.81 -25.4 90)
-					(length 2.54) hide
+					(length 2.54)
 					(name "GND"
 						(effects
 							(font
@@ -2557,7 +2558,7 @@
 				)
 				(pin power_in line
 					(at -3.81 -25.4 90)
-					(length 2.54)
+					(length 2.54) hide
 					(name "GND"
 						(effects
 							(font
@@ -2825,24 +2826,6 @@
 						)
 					)
 				)
-				(pin power_in line
-					(at 0 -25.4 90)
-					(length 2.54)
-					(name "GND"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "4"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
 				(pin bidirectional line
 					(at 12.7 -2.54 180)
 					(length 2.54)
@@ -2900,7 +2883,7 @@
 				(pin bidirectional line
 					(at 12.7 -10.16 180)
 					(length 2.54)
-					(name "SDA/A4"
+					(name "A4"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2918,7 +2901,7 @@
 				(pin bidirectional line
 					(at 12.7 -12.7 180)
 					(length 2.54)
-					(name "SCL/A5"
+					(name "A5"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -6567,19 +6550,19 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "321ac916-23db-4364-a954-866e29e8bdd7")
 		(property "Reference" "A2"
-			(at 290.4841 168.91 0)
+			(at 274.066 112.776 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 				(justify left)
+				(hide yes)
 			)
 		)
 		(property "Value" "Arduino_Nano_Every"
-			(at 290.4841 171.45 0)
+			(at 265.43 116.332 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6588,7 +6571,7 @@
 			)
 		)
 		(property "Footprint" "Module:Arduino_Nano"
-			(at 288.29 143.51 0)
+			(at 288.036 100.838 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6598,7 +6581,7 @@
 			)
 		)
 		(property "Datasheet" "https://content.arduino.cc/assets/NANOEveryV3.0_sch.pdf"
-			(at 288.29 143.51 0)
+			(at 288.036 105.156 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6607,7 +6590,7 @@
 			)
 		)
 		(property "Description" "Arduino Nano Every"
-			(at 288.29 143.51 0)
+			(at 287.528 97.028 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6638,9 +6621,6 @@
 		)
 		(pin "27"
 			(uuid "2f91c889-735e-4202-a0c0-e820d839897b")
-		)
-		(pin "4"
-			(uuid "87d6aba7-e6c7-4e4a-a36d-9e12f8cb35a8")
 		)
 		(pin "5"
 			(uuid "f5cf7688-333b-4553-b129-cee264c4df5b")

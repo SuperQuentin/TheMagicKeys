@@ -10489,7 +10489,7 @@
 				)
 			)
 		)
-		(property "Value" "1 KOhm"
+		(property "Value" "4.7 KOhm"
 			(at 71.12 45.72 0)
 			(effects
 				(font
@@ -10601,7 +10601,7 @@
 				)
 			)
 		)
-		(property "Value" "4.7 KOhm"
+		(property "Value" "20 KOhm"
 			(at 124.46 45.72 0)
 			(effects
 				(font
