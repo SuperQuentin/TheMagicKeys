@@ -6,7 +6,7 @@ using namespace daisy;
 
 /* Constants */
 #define MAX_MESSAGE_SIZE 20
-#define NB_OSCILLATORS   6
+#define NB_OSCILLATORS   35
 
 /* Types */
 typedef enum {KEY_UP_MSG, KEY_DOWN_MSG} e_msg_type;
@@ -226,7 +226,7 @@ int main(void)
     {
         osc[osc_idx].Init(sample_rate);
         osc[osc_idx].SetWaveform(Oscillator::WAVE_SIN);
-        osc[osc_idx].SetFreq(110 * (osc_idx + 1));
+        osc[osc_idx].SetFreq(100 * (osc_idx + 1));
         osc[osc_idx].SetAmp(0);
     }
 
@@ -259,11 +259,11 @@ int main(void)
 
                     hw.PrintLine("amp_factor=" FLT_FMT3, FLT_VAR3(amp_factor));
 
-                    osc[key_index].SetAmp(amp_factor);
+                    osc[key_index % NB_OSCILLATORS].SetAmp(amp_factor);
                 } 
                 else if (msg_type == KEY_UP_MSG) 
                 {
-                    osc[key_index].SetAmp(0.0f);
+                    osc[key_index % NB_OSCILLATORS].SetAmp(0.0f);
                 }
             }
         }
