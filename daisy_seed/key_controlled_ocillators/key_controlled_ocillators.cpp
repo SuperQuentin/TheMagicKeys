@@ -211,6 +211,7 @@ int main(void)
     uint16_t key_index;
     e_msg_type msg_type;
     uint32_t attack_time;
+    bool led_state = false;
 
     // Initialize hardware
     hw.Configure();
@@ -238,8 +239,8 @@ int main(void)
     initialize_uart(&uart);
     flush_uart(&uart);
 
-    // Switch on the right LED
-    hw.SetLed(true);
+    // Toggle the right LED from OFF to ON
+    hw.SetLed(!led_state);
 
     // Receive messages from UART
     float amp_factor;
@@ -249,6 +250,9 @@ int main(void)
         if (result == 0)
         {   
             result = analyze_msg_received(msg_rec, &key_index, &msg_type, &attack_time);
+            // Toggle the right LED
+            hw.SetLed(!led_state);
+
             if (result == 0)
             {
                 hw.PrintLine("key_index=%d, msg_type=%d, attack_time=%ld", key_index, msg_type, attack_time);
