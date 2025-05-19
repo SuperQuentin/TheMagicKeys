@@ -20,15 +20,15 @@ using namespace daisy;
 /*************************************************************************************************
 * Defines
 *************************************************************************************************/
-#define NB_KEYS                     85
-#define MAX_NB_SIMULTANEOUS_NOTES   10
+#define NB_KEYS                     85      // Number of keys and notes.
+#define MAX_NB_SIMULTANEOUS_NOTES   10      // 10 notes at 100% volume can be played without saturation.
 #define ATTACK_TIME_MS              10      // Milliseconds
 #define RELEASE_TIME_MS             250     // Milliseconds
 #define SAMPLE_RATE_HZ              44000   // Hertz
 #define RELEASE_NB_SAMPLES          ((SAMPLE_RATE_HZ * RELEASE_TIME_MS) / 1000) 
 #define ATTACK_NB_SAMPLES           ((SAMPLE_RATE_HZ * ATTACK_TIME_MS) / 1000)
 
-// Wav files
+// Wav files on the SD card
 #define MAX_FILE_NAME_LEN 40
 #define MAX_FILE_PATH_LEN 200
 #define WAV_FILE_PATH "/piano_wav/current"
@@ -38,15 +38,18 @@ using namespace daisy;
 /*************************************************************************************************
 * Types
 *************************************************************************************************/
+
+// Structure defining a note
 typedef struct
 {
-    size_t first_sample_pos;
-    size_t last_sample_pos;
-    size_t nb_samples;
-    bool playing;
-    size_t cur_playing_pos;
-    bool released;
-    size_t release_pos;
+    // All ..._pos variables define positions in the buffer sample_data.
+    size_t first_sample_pos; // Position of the first sample of a note.
+    size_t last_sample_pos;  // Position of the last sample of a note.
+    size_t nb_samples;       // Number of samples of a note.
+    bool playing;            // Define if the note is currently playing (key down).
+    size_t cur_playing_pos;  // Define the position of the sample to play.
+    bool released;           // Define if the note is in the release phase (key up).
+    size_t release_pos;      // Define the position where the key was released.
 } TNoteData;
 
 /*************************************************************************************************
@@ -61,9 +64,7 @@ char           wav_file_name_list[NB_KEYS * MAX_FILE_NAME_LEN];
 // Buffer in external RAM containing all the samples
 int16_t        DSY_SDRAM_BSS sample_data[MAX_WAV_DATA_SIZE_WORD];
 
-// Variables to manage samples reading and playing.
-size_t         current_sample_pos;
-
+// Variable defining all the notes 
 TNoteData      notes[NB_KEYS];
 
 /*************************************************************************************************
@@ -82,22 +83,24 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
     float attack_factor;
     TNoteData *pCurNote;
 
+    // Several samples must be generated.
     for(size_t block_idx = 0; block_idx < size; block_idx += 2)
     {
-        sig_float = 0;
+        sig_float = 0; // The signal value.
         
-        // Scan all the notes.
+        // Scan all the notes of the notes array.
         for (size_t note_idx = 0; note_idx < NB_KEYS; note_idx++)
         {
             pCurNote = &notes[note_idx];
             
-            if (pCurNote->playing == true)
+            if (pCurNote->playing == true) // This note is playing.
             {
                 // Compute the note signal (with the polyphony factor).
                 note_sig_int16 = sample_data[pCurNote->cur_playing_pos] / MAX_NB_SIMULTANEOUS_NOTES;
                 note_sig_float = s162f(note_sig_int16);
 
                 // Attack
+                // The attack factor avoids a tick sound at the note start.
                 if (pCurNote->cur_playing_pos - pCurNote->first_sample_pos < ATTACK_NB_SAMPLES)
                 {
                     attack_factor = (float)(pCurNote->cur_playing_pos - pCurNote->first_sample_pos);
@@ -106,13 +109,15 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                 }
 
                 // Release
+                // At the end of the release the notes data are re-initialised.
+                // The release factor allows a more natural sound at key release.
                 if (pCurNote->released == true)
                 {
                     if ( (pCurNote->cur_playing_pos - pCurNote->release_pos > RELEASE_NB_SAMPLES) ||
                          (pCurNote->cur_playing_pos >= pCurNote->last_sample_pos) 
                        )
                     {
-                        // End of the note
+                        // End of the note -> Note data re-initialisation.
                         pCurNote->playing = false;
                         pCurNote->released = false;
                         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
@@ -120,7 +125,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                     }
                     else
                     {
-                        // Release
+                        // Release factor
                         release_factor = (float)(pCurNote->release_pos + RELEASE_NB_SAMPLES - pCurNote->cur_playing_pos);
                         release_factor /= (float)RELEASE_NB_SAMPLES;
                     }
@@ -129,10 +134,10 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
  
                 } // if (pCurNote->released
                 
-                // Sum all the note signals
+                // Sum all the note signals (polyphony)
                 sig_float += note_sig_float;
                 
-                // Increment current read position only if end of note not reached.
+                // Increment current read position (if end of note not reached).
                 if (pCurNote->cur_playing_pos < pCurNote->last_sample_pos)
                 {
                     pCurNote->cur_playing_pos++;
@@ -183,7 +188,7 @@ size_t read_wav_file(char *file_name, uint8_t* ram_address)
     FRESULT result;
     size_t wav_data_size = 0;
 
-    // Read wav file info (size to skip to read data)
+    // Read wav file info (file siye and size to skip to reach sample data)
     result = f_open(&SDFile, file_name, FA_READ);
     if (result == FR_OK)
     {
@@ -227,7 +232,7 @@ size_t read_wav_file(char *file_name, uint8_t* ram_address)
     return(wav_data_size);
 }
 
-// Build a list of all wav files name in the wav directory. 
+// Build a list of all wav files name in the wav directory of the SD card. 
 void build_wav_file_name_list(void)
 {
     DIR     dir;
@@ -262,14 +267,14 @@ void build_wav_file_name_list(void)
             break;
         }
 
-        // Skip if its a directory or a hidden file.
+        // Skip element if its a directory or a hidden file.
         if(finf.fattrib & (AM_HID | AM_DIR))
         {
             hw.PrintLine("Skip element");
             continue;
         }
         
-        // Now we'll check if its .wav and add to the list.
+        // Check if its a wav file. If yes, add it to the list.
         hw.PrintLine("finf.fname=%s", finf.fname);
 
         if(strstr(finf.fname, ".wav") || strstr(finf.fname, ".WAV"))
@@ -306,16 +311,20 @@ void build_wav_file_name_list(void)
 }
 
 // Read and load the wav file data in external RAM. One file per note.
-// Build an array containing the start position in RAM of each note.
+// Update the notes array with the start and end position in RAM of each note.
 void load_wav_files_in_ram(void)
 {
     char file_path_and_name[MAX_FILE_PATH_LEN];
     size_t wav_data_size_bytes = 0;
     size_t start_note_word_pos = 0;
     uint8_t* ram_address = NULL;
+    TNoteData *pCurNote;
 
     for (uint16_t file_idx = 0; file_idx < NB_KEYS; file_idx++)
     {
+        // Current note data
+        pCurNote = &notes[file_idx];
+
         // Build the full file path name
         strcpy(file_path_and_name, WAV_FILE_PATH);
         strcat(file_path_and_name, "/");
@@ -326,16 +335,16 @@ void load_wav_files_in_ram(void)
         ram_address = (uint8_t*)(&sample_data[start_note_word_pos]);
         wav_data_size_bytes = read_wav_file(file_path_and_name, ram_address);
 
-        // For each note record the position of the first sample and the number of samples.
-        notes[file_idx].first_sample_pos = start_note_word_pos;
-        notes[file_idx].nb_samples = wav_data_size_bytes / 2; // bytes to word size
-        notes[file_idx].last_sample_pos = notes[file_idx].first_sample_pos + notes[file_idx].nb_samples;
-        notes[file_idx].cur_playing_pos = notes[file_idx].first_sample_pos;
+        // For each note record the position of the first sample, last sample and number of samples.
+        pCurNote->first_sample_pos = start_note_word_pos;
+        pCurNote->nb_samples = wav_data_size_bytes / 2; // bytes to word size
+        pCurNote->last_sample_pos = pCurNote->first_sample_pos + pCurNote->nb_samples;
+        pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
 
-        hw.PrintLine("Note start_position=%d nb_samples=%d", notes[file_idx].first_sample_pos, notes[file_idx].nb_samples);
+        hw.PrintLine("Note start_position=%d nb_samples=%d", pCurNote->first_sample_pos, pCurNote->nb_samples);
 
-        // Update the note position.
-        start_note_word_pos += notes[file_idx].nb_samples; // bytes to word size
+        // Compute the next note position.
+        start_note_word_pos += pCurNote->nb_samples;
     }
 }
 
@@ -344,11 +353,13 @@ int main(void)
 {
     // Initialise global variables
     memset(notes, 0, sizeof(notes));
+    memset(wav_file_name_list, 0, sizeof(wav_file_name_list));
 
     // Initialise hardware
     hw.Init();
 
-    // Wait for serial line connection to log.
+    // Initialise serial log.
+    // With parameter true, wait for the serial line connection.
     hw.StartLog(false);
 
     // Initialise and mount the SD card
@@ -363,22 +374,20 @@ int main(void)
     hw.PrintLine("Loading the wav files in RAM...");
     load_wav_files_in_ram();
 
-	// Prepare and start audio call back
-    current_sample_pos = 0;
+	// Prepare and start the audio call back
     hw.SetAudioBlockSize(4); // number of samples handled per callback
 	hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 	hw.StartAudio(AudioCallback);
     
-    // Play all notes one by one.
-     
-    hw.PrintLine("Play all notes one by one...");
+    // Play all notes one by one (the range).
+    hw.PrintLine("Play all notes one by one at different speed...");
     uint32_t time_ms = 32;
     bool down = false;
     do
     {    
         for (size_t idx = 0; idx < NB_KEYS; idx++)
         {
-             hw.PrintLine("Index of note playing=%d time_ms=%d", idx, time_ms);
+            hw.PrintLine("Index of note playing=%d time_ms=%d", idx, time_ms);
 
             notes[idx].playing = true;
     
@@ -391,10 +400,10 @@ int main(void)
             System::Delay(time_ms);
         }
         
+        // Change of speed
         if (down == true)
         {
             time_ms /= 2;
-
             if (time_ms <= 32)
             {
                 down = false;
@@ -403,8 +412,7 @@ int main(void)
         else
         {
             time_ms *= 2;
-
-            if (time_ms >= 512)
+            if (time_ms >= 16384)
             {
                 down = true;
             }
