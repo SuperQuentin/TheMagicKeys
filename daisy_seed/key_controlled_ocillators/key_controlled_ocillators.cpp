@@ -195,7 +195,7 @@ float compute_amplification( uint32_t attack_time)
     }
     else if (amp_factor < 0.1f)
     {
-    amp_factor = 0.1f;
+        amp_factor = 0.1f;
     }
 
     amp_factor = amp_factor * 1.0f / 6.0f;
