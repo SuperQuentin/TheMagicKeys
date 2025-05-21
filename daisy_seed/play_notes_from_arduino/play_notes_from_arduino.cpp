@@ -20,13 +20,17 @@ using namespace daisy;
 /*************************************************************************************************
 * Defines
 *************************************************************************************************/
+
+// Notes, samples and keys
 #define NB_KEYS                     85      // Number of keys and notes.
 #define MAX_NB_SIMULTANEOUS_NOTES   10      // 10 notes at 100% volume can be played without saturation.
-#define ATTACK_TIME_MS              10      // Milliseconds
-#define RELEASE_TIME_MS             250     // Milliseconds
+#define WAV_ENV_START_MS            10      // Wav enveloppe beginning in milliseconds. 
+#define WAV_ENV_END_MS              250     // Wav enveloppe end in milliseconds.
 #define SAMPLE_RATE_HZ              44000   // Hertz
-#define RELEASE_NB_SAMPLES          ((SAMPLE_RATE_HZ * RELEASE_TIME_MS) / 1000) 
-#define ATTACK_NB_SAMPLES           ((SAMPLE_RATE_HZ * ATTACK_TIME_MS) / 1000)
+#define WAV_ENV_START_NB_SAMPLES    ((SAMPLE_RATE_HZ * WAV_ENV_START_MS) / 1000)
+#define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000) 
+#define MAX_ATTACK_TIME             10000   // Maximum key velocity.
+#define MIN_ATTACK_TIME             300     // Minimum key velocity.
 
 // Wav files on the SD card
 #define MAX_FILE_NAME_LEN 40
@@ -53,6 +57,7 @@ typedef struct
     size_t cur_playing_pos;  // Define the position of the sample to play.
     bool released;           // Define if the note is in the release phase (key up).
     size_t release_pos;      // Define the position where the key was released.
+    float volume;            // Define the amplification wich depends on the attack time.
 } TNoteData;
 
 // Message received from arduino
@@ -101,39 +106,43 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
             
             if (pCurNote->playing == true) // This note is playing.
             {
-                // Compute the note signal (with the polyphony factor).
+                // Compute the note signal taking into account: 
+                // - the polyphony factor (10 simulatenous notes at max volume without saturation).
+                // - the volume which depends on the attack time (key velocity).
                 note_sig_int16 = sample_data[pCurNote->cur_playing_pos] / MAX_NB_SIMULTANEOUS_NOTES;
                 note_sig_float = s162f(note_sig_int16);
+                note_sig_float *= pCurNote->volume;
 
                 // Attack
                 // The attack factor avoids a tick sound at the note start.
-                if (pCurNote->cur_playing_pos - pCurNote->first_sample_pos < ATTACK_NB_SAMPLES)
+                // It is a linear wav enveloppe applied at the note start.
+                if (pCurNote->cur_playing_pos - pCurNote->first_sample_pos < WAV_ENV_START_NB_SAMPLES)
                 {
                     attack_factor = (float)(pCurNote->cur_playing_pos - pCurNote->first_sample_pos);
-                    attack_factor /= (float)ATTACK_NB_SAMPLES;
+                    attack_factor /= (float)WAV_ENV_START_NB_SAMPLES;
                     note_sig_float *= attack_factor;
                 }
 
                 // Release
                 // At the end of the release the notes data are re-initialised.
                 // The release factor allows a more natural sound at key release.
+                // It is a linear wav enveloppe applied at the note end.
                 if (pCurNote->released == true)
                 {
-                    if ( (pCurNote->cur_playing_pos - pCurNote->release_pos > RELEASE_NB_SAMPLES) ||
+                    if ( (pCurNote->cur_playing_pos - pCurNote->release_pos > WAV_ENV_END_NB_SAMPLES) ||
                          (pCurNote->cur_playing_pos >= pCurNote->last_sample_pos) 
                        )
                     {
                         // End of the note -> Note data re-initialisation.
                         pCurNote->playing = false;
                         pCurNote->released = false;
-                        pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
                         release_factor = 0.0;
                     }
                     else
                     {
                         // Release factor
-                        release_factor = (float)(pCurNote->release_pos + RELEASE_NB_SAMPLES - pCurNote->cur_playing_pos);
-                        release_factor /= (float)RELEASE_NB_SAMPLES;
+                        release_factor = (float)(pCurNote->release_pos + WAV_ENV_END_NB_SAMPLES - pCurNote->cur_playing_pos);
+                        release_factor /= (float)WAV_ENV_END_NB_SAMPLES;
                     }
                     
                     note_sig_float *= release_factor;
@@ -492,7 +501,51 @@ int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, 
     return result;
 }
 
-// Main program
+/* Compute the amplification factor which depends on the attack_time
+   We compute a linear function such as: 
+   - For time <= Tmin -> amp_factor = 1
+   - For time >= Tmax -> amp_factor = 0.1
+   Thus, the linear function is: amp_factor = a.time + b
+   with: 
+   a = -0.9 / (Tmax - Tmin)
+   b = 1 - a.Tmin
+   e.g For Tmin = 300 and TMax = 10000 the function is:
+   a = -9.27e-5 and b = 1.027
+*/
+float compute_volume(uint32_t attack_time)
+{
+    float amp_factor;
+    float slope;
+    float offset;
+    
+    slope  = -0.9 / (float)(MAX_ATTACK_TIME - MIN_ATTACK_TIME);
+    offset = 1.0 - slope * (float)MIN_ATTACK_TIME;
+
+    amp_factor = slope * (float)attack_time + offset;
+    
+    if (amp_factor > 1.0f)
+    {
+        amp_factor = 1.0f;
+    }
+    else if (amp_factor < 0.1f)
+    {
+        amp_factor = 0.1f;
+    }
+
+    return amp_factor;
+}
+
+/* Toggle the right LED state */
+void toggle_right_led(void)
+{
+    static bool led_state = false; // OFF
+    
+    led_state = !led_state;
+
+    hw.SetLed(led_state);
+}
+
+/* Main program */
 int main(void)
 {
     char msg_rec[MAX_MESSAGE_SIZE];
@@ -500,8 +553,8 @@ int main(void)
     uint16_t key_index;
     e_msg_type msg_type;
     uint32_t attack_time;
-    bool led_state = false;
     UartHandler uart;
+    TNoteData *pCurNote;
 
     // Initialise global variables
     memset(notes, 0, sizeof(notes));
@@ -509,32 +562,31 @@ int main(void)
 
     // Initialise hardware
     hw.Init();
+    toggle_right_led();
 
     // Initialise serial log.
     // Set parameter to true to wait for the serial line connection.
     hw.StartLog(true);
-
-    // Toggle the right LED
-    hw.SetLed(!led_state);
+    toggle_right_led();
 
     // Initialise and mount the SD card
     hw.PrintLine("Mounting SD card...");
+    toggle_right_led();
     mount_sd_card();
 
     // Build a sorted list of wav file name (one per note).
     hw.PrintLine("Building the list of wav files...");
+    toggle_right_led();
     build_wav_file_name_list();
 
     // Read each wav file and load it in RAM.
     hw.PrintLine("Loading the wav files in RAM...");
+    toggle_right_led();
     load_wav_files_in_ram();
 
     // Initialize UART
     initialize_uart(&uart);
     flush_uart(&uart);
-
-    // Toggle the right LED
-    hw.SetLed(!led_state);
 
 	// Prepare and start the audio call back
     hw.SetAudioBlockSize(4); // number of samples handled per callback
@@ -543,6 +595,7 @@ int main(void)
     
     // Play notes received from arduino.
     hw.PrintLine("Play notes received from arduino...");
+    toggle_right_led();
 
     // Receive messages from UART
     while(true)
@@ -551,23 +604,28 @@ int main(void)
         if (result == 0)
         {   
             result = analyze_msg_received(msg_rec, &key_index, &msg_type, &attack_time);
-            
-            // Toggle the right LED
-            hw.SetLed(!led_state);
 
             if (result == 0)
             {
-                hw.PrintLine("key_index=%d, msg_type=%d, attack_time=%ld", key_index, msg_type, attack_time);
+                toggle_right_led();
 
+                pCurNote = &notes[key_index];
+                
                 if (msg_type == KEY_DOWN_MSG) 
                 {
-                    notes[key_index].playing = true;
+                    hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
+
+                    pCurNote->volume = compute_volume(attack_time);
+                    hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
+
+                    pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
+                    pCurNote->playing = true;
                 } 
                 else if (msg_type == KEY_UP_MSG) 
                 {
-                    notes[key_index].released = true;
-
-                    notes[key_index].release_pos = notes[key_index].cur_playing_pos;
+                    hw.PrintLine("KEY_UP index=%d", key_index);
+                    pCurNote->release_pos = pCurNote->cur_playing_pos;
+                    pCurNote->released = true;
                 }
             }
         } // if (result == 0)
