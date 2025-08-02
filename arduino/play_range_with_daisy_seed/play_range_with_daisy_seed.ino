@@ -17,7 +17,24 @@ void setup(void)
 
   // Switch on the onboard LED
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(LED_BUILTIN, LOW);
+}
+
+/* Toggle the led state */
+void toggle_led(void)
+{
+  static bool led_state = false;
+
+  led_state = !led_state;
+
+  if (led_state == true)
+  {
+    digitalWrite(LED_BUILTIN, HIGH);
+  }
+  else
+  {
+    digitalWrite(LED_BUILTIN, LOW);
+  }
 }
 
 /* Function called regularly after setup */
@@ -34,10 +51,12 @@ void loop(void)
     for(unsigned char key_index=0; key_index<NB_KEYS; key_index++)
     {
       send_key_down_msg(key_index, attack_time);
+      toggle_led();
 
       delay(key_time_ms);
 
       send_key_up_msg(key_index);
+      toggle_led();
 
       delay(key_time_ms);
     }

@@ -27,7 +27,7 @@ using namespace daisy;
 #define NB_KEYS                     85      // Number of keys and notes.
 #define MAX_NB_SIMULTANEOUS_NOTES   10      // 10 notes at 100% volume can be played without saturation.
 #define WAV_ENV_START_MS            10      // Wav enveloppe beginning in milliseconds. 
-#define WAV_ENV_END_MS              100     // Wav enveloppe end in milliseconds.
+#define WAV_ENV_END_MS              0       // Wav enveloppe end in milliseconds.
 #define SAMPLE_RATE_HZ              44000   // Hertz
 #define WAV_ENV_START_NB_SAMPLES    ((SAMPLE_RATE_HZ * WAV_ENV_START_MS) / 1000)
 #define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000) 
@@ -532,8 +532,6 @@ void midi_decode_var_length_param(uint8_t* data, uint32_t* value, uint8_t* len)
     *len = 0;
     for (uint8_t idx = 0; idx < 4; idx++)
     {
-        hw.PrintLine("data[idx]=%d", data[idx]);
-
         byte_value = data[idx] & 0x7F;
 
         ret_value = ret_value << 7;
@@ -542,7 +540,6 @@ void midi_decode_var_length_param(uint8_t* data, uint32_t* value, uint8_t* len)
         last_byte = ((data[idx] & 0x80) == 0);
         if (last_byte == true)
         {
-            hw.PrintLine("Last byte found");
             *len = idx + 1;
             break;
         }
@@ -594,6 +591,7 @@ void play_midi_file_from_ram(void)
     uint8_t key_idx;
     uint8_t velocity;
     TNoteData* pCurNote = NULL;
+    uint32_t note_counter;
 
     // Header
     hw.PrintLine("** HEADER **");
@@ -636,6 +634,7 @@ void play_midi_file_from_ram(void)
         
         // Parsing of one track.
         start_track_idx = idx;
+        note_counter = 0;
         while(true)
         {
             // v_time
@@ -766,7 +765,10 @@ void play_midi_file_from_ram(void)
                     
                     if (velocity != 0)
                     {
+                        note_counter++;
+
                         pCurNote->volume = 1.0;
+
                         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
                         pCurNote->playing = true;
                     }

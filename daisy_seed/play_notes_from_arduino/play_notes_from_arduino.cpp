@@ -2,7 +2,7 @@
 * This program:
 * - reads wav files from a SD card directory (one wav file per note).
 * - loads the wav data samples in external RAM memory (65 Mbytes).
-* - plays the notes one by one (a.k.a. the range).
+* - manages the simple communication protocol with the Arduino (note_on, note_off).
 *
 * The release of the key is managed by a linear decrease of the signal amplitude (~250 milliseconds).
 * To avoid a click sound at the note start (a.k.a. attack) a linear increase of the signal 
@@ -25,12 +25,12 @@ using namespace daisy;
 #define NB_KEYS                     85      // Number of keys and notes.
 #define MAX_NB_SIMULTANEOUS_NOTES   10      // 10 notes at 100% volume can be played without saturation.
 #define WAV_ENV_START_MS            10      // Wav enveloppe beginning in milliseconds. 
-#define WAV_ENV_END_MS              250     // Wav enveloppe end in milliseconds.
+#define WAV_ENV_END_MS              0       // Wav enveloppe end in milliseconds.
 #define SAMPLE_RATE_HZ              44000   // Hertz
 #define WAV_ENV_START_NB_SAMPLES    ((SAMPLE_RATE_HZ * WAV_ENV_START_MS) / 1000)
 #define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000) 
-#define MAX_ATTACK_TIME             10000   // Maximum key velocity.
-#define MIN_ATTACK_TIME             300     // Minimum key velocity.
+#define MAX_ATTACK_TIME             100000  // Maximum key velocity.
+#define MIN_ATTACK_TIME             10000   // Minimum key velocity.
 
 // Wav files on the SD card
 #define MAX_FILE_NAME_LEN 40
@@ -435,6 +435,20 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
     return result;
 }
 
+/* The Arduino manages 7 keys per satellite board but only 6 piano keys are conected. 
+   So, the numbering of keys between the arduino and the daisy seed is different. 
+   This function does the conversion.
+   Arduino keys:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 ...
+   Piano keys:    0  1  2  3  4  5  NC 6  7  8  9 10 11 NC 12 13 14 ...
+   NC stands for Not Connected. 
+   */
+uint16_t arduino_to_piano_key_index(uint16_t key_index_arduino)
+{
+    uint16_t key_index_piano = key_index_arduino - (key_index_arduino / 7);
+
+    return(key_index_piano);
+}
+
 int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, e_msg_type *p_msg_type, uint32_t* p_time)
 {
     int result = 0;
@@ -462,7 +476,7 @@ int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, 
             hw.PrintLine("Error: Problem to convert key_index received");
             result = -1;
         }
-        *p_key_index = key_index;
+        *p_key_index = arduino_to_piano_key_index(key_index);
         
         // time
         strncpy(temp_str, &msg_rec[4], msg_len - 4);
@@ -490,7 +504,7 @@ int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, 
             hw.PrintLine("Error: Problem to convert key_index received");
             result = -1;
         }
-        *p_key_index = key_index;
+        *p_key_index = arduino_to_piano_key_index(key_index);
     }
     else
     {
@@ -566,7 +580,7 @@ int main(void)
 
     // Initialise serial log.
     // Set parameter to true to wait for the serial line connection.
-    hw.StartLog(true);
+    hw.StartLog(false);
     toggle_right_led();
 
     // Initialise and mount the SD card
