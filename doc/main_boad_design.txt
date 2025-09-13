@@ -1,4 +1,5 @@
 **** TODO ****
+- Add GND and VCC pins for debugging.
 
 **** Calculate voltage regulator current to provide ****
 Satellite boards

@@ -25,7 +25,7 @@ using namespace daisy;
 #define NB_KEYS                     85      // Number of keys and notes.
 #define MAX_NB_SIMULTANEOUS_NOTES   10      // 10 notes at 100% volume can be played without saturation.
 #define WAV_ENV_START_MS            10      // Wav enveloppe beginning in milliseconds. 
-#define WAV_ENV_END_MS              0       // Wav enveloppe end in milliseconds.
+#define WAV_ENV_END_MS              250     // Wav enveloppe end in milliseconds.
 #define SAMPLE_RATE_HZ              44000   // Hertz
 #define WAV_ENV_START_NB_SAMPLES    ((SAMPLE_RATE_HZ * WAV_ENV_START_MS) / 1000)
 #define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000) 
@@ -634,6 +634,7 @@ int main(void)
 
                     pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
                     pCurNote->playing = true;
+                    pCurNote->released = false;
                 } 
                 else if (msg_type == KEY_UP_MSG) 
                 {

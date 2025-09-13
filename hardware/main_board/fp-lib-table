@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Piano_Library")(type "KiCad")(uri "C:/dev/TheMagicKeys/hardware/kicad_libraries/Piano_Library.pretty")(options "")(descr ""))
+)

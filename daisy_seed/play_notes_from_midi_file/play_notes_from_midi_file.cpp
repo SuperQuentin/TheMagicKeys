@@ -27,7 +27,7 @@ using namespace daisy;
 #define NB_KEYS                     85      // Number of keys and notes.
 #define MAX_NB_SIMULTANEOUS_NOTES   10      // 10 notes at 100% volume can be played without saturation.
 #define WAV_ENV_START_MS            10      // Wav enveloppe beginning in milliseconds. 
-#define WAV_ENV_END_MS              0       // Wav enveloppe end in milliseconds.
+#define WAV_ENV_END_MS              250     // Wav enveloppe end in milliseconds.
 #define SAMPLE_RATE_HZ              44000   // Hertz
 #define WAV_ENV_START_NB_SAMPLES    ((SAMPLE_RATE_HZ * WAV_ENV_START_MS) / 1000)
 #define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000) 
@@ -566,6 +566,8 @@ void toggle_right_led(void)
 // Parse the MIDI file from RAM and play the notes.
 void play_midi_file_from_ram(void)
 {
+    uint32_t tempo = 500; //[millisec / quarter_note]
+    uint8_t shift_notes = 24;
     uint32_t idx = 0;
     uint32_t header_len;
     uint16_t file_format;
@@ -587,7 +589,6 @@ void play_midi_file_from_ram(void)
     uint8_t data_byte_1 = 0;
     uint8_t data_byte_2 = 0;
     uint32_t time_ms;
-    uint32_t tempo = 500; //[millisec / quarter_note]
     uint8_t key_idx;
     uint8_t velocity;
     TNoteData* pCurNote = NULL;
@@ -748,11 +749,15 @@ void play_midi_file_from_ram(void)
                 {
                     // Note_On
                     toggle_right_led();
-
+                    
                     key_idx = data_byte_1;
+                    if (key_idx >= shift_notes)
+                    {
+                        key_idx -= shift_notes;
+                    }
                     if (key_idx >= NB_KEYS)
                     {
-                        key_idx = NB_KEYS;
+                        key_idx = NB_KEYS; 
                     }
 
                     if (key_idx > 0)
@@ -771,6 +776,7 @@ void play_midi_file_from_ram(void)
 
                         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
                         pCurNote->playing = true;
+                        pCurNote->released = false;
                     }
                     else
                     {
