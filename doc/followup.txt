@@ -1,11 +1,8 @@
 **** TODO ****
 - Investigate issue: 2 sat. boards not readable.
 - Investigate issue: sometimes the main board does not start properly.
-- [Main board] Design the PCB.
 - [Main board software]Add pedal management.
-- Buy an audio amplifier.
 - Buy a power supply. 
-- Buy speakers.
 - [Hardware] Connect Key 85 + Pedal.
 - Design volume adjustement button.
 - Design mode adjustement button.

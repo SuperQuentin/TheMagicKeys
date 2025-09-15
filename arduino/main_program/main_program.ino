@@ -89,10 +89,6 @@ void setup(void)
   
   // Iniatialize key management data
   initialise_all_keys();
-
-  // Switch on the onboard LED
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 /* Function called regularly after setup */
