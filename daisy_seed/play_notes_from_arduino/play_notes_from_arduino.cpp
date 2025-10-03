@@ -31,6 +31,7 @@ using namespace daisy;
 #define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000) 
 #define MAX_ATTACK_TIME             100000  // Maximum key velocity.
 #define MIN_ATTACK_TIME             10000   // Minimum key velocity.
+#define PEDAL_KEY_IDX               85      // We consider for convenience that the pedal key is the 86th key.
 
 // Wav files on the SD card
 #define MAX_FILE_NAME_LEN 40
@@ -49,16 +50,19 @@ using namespace daisy;
 // Structure defining a note
 typedef struct
 {
-    // All ..._pos variables define positions in the buffer sample_data.
+    // All ..._pos fields define positions in the buffer sample_data.
     size_t first_sample_pos; // Position of the first sample of a note.
     size_t last_sample_pos;  // Position of the last sample of a note.
     size_t nb_samples;       // Number of samples of a note.
     bool playing;            // Define if the note is currently playing (key down).
     size_t cur_playing_pos;  // Define the position of the sample to play.
-    bool released;           // Define if the note is in the release phase (key up).
-    size_t release_pos;      // Define the position where the key was released.
+    bool key_up;             // Define if the note is in the release phase (key up).
+    size_t key_up_pos;       // Define the position where the key was released.
+    size_t pedal_up_pos;     // Define the position where the pedal was released.
     float volume;            // Define the amplification wich depends on the attack time.
 } TNoteData;
+
+bool pedal_up;               // Define if the pedal is up.
 
 // Message received from arduino
 typedef enum {KEY_UP_MSG, KEY_DOWN_MSG} e_msg_type;
@@ -93,6 +97,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
     float release_factor;
     float attack_factor;
     TNoteData *pCurNote;
+    size_t release_pos;
 
     // Several samples must be generated.
     for(size_t block_idx = 0; block_idx < size; block_idx += 2)
@@ -127,27 +132,39 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                 // At the end of the release the notes data are re-initialised.
                 // The release factor allows a more natural sound at key release.
                 // It is a linear wav enveloppe applied at the note end.
-                if (pCurNote->released == true)
+                if ((pCurNote->key_up == true) && (pedal_up == true))
                 {
-                    if ( (pCurNote->cur_playing_pos - pCurNote->release_pos > WAV_ENV_END_NB_SAMPLES) ||
+                    if (pCurNote->key_up_pos < pCurNote->pedal_up_pos)
+                    {
+                        release_pos = pCurNote->pedal_up_pos;
+                    }
+                    else
+                    {
+                        release_pos = pCurNote->key_up_pos;
+                    }
+
+                    if ( (pCurNote->cur_playing_pos - release_pos > WAV_ENV_END_NB_SAMPLES) ||
                          (pCurNote->cur_playing_pos >= pCurNote->last_sample_pos) 
                        )
                     {
-                        // End of the note -> Note data re-initialisation.
-                        pCurNote->playing = false;
-                        pCurNote->released = false;
+                        // End of the note -> Note: data re-initialisation.
+                        pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
+                        pCurNote->key_up_pos = pCurNote->first_sample_pos;
+                        pCurNote->pedal_up_pos = pCurNote->first_sample_pos;
                         release_factor = 0.0;
+                        pCurNote->key_up = false;
+                        pCurNote->playing = false;
                     }
                     else
                     {
                         // Release factor
-                        release_factor = (float)(pCurNote->release_pos + WAV_ENV_END_NB_SAMPLES - pCurNote->cur_playing_pos);
+                        release_factor = (float)(release_pos + WAV_ENV_END_NB_SAMPLES - pCurNote->cur_playing_pos);
                         release_factor /= (float)WAV_ENV_END_NB_SAMPLES;
                     }
                     
                     note_sig_float *= release_factor;
  
-                } // if (pCurNote->released
+                } // if (pCurNote->key_up
                 
                 // Sum all the note signals (polyphony)
                 sig_float += note_sig_float;
@@ -355,6 +372,8 @@ void load_wav_files_in_ram(void)
         pCurNote->nb_samples = wav_data_size_bytes / 2; // bytes to word size
         pCurNote->last_sample_pos = pCurNote->first_sample_pos + pCurNote->nb_samples;
         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
+        pCurNote->key_up_pos      = pCurNote->first_sample_pos;
+        pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
 
         hw.PrintLine("Note start_position=%d nb_samples=%d", pCurNote->first_sample_pos, pCurNote->nb_samples);
 
@@ -435,17 +454,33 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
     return result;
 }
 
-/* The Arduino manages 7 keys per satellite board but only 6 piano keys are conected. 
-   So, the numbering of keys between the arduino and the daisy seed is different. 
-   This function does the conversion.
-   Arduino keys:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 ...
-   Piano keys:    0  1  2  3  4  5  NC 6  7  8  9 10 11 NC 12 13 14 ...
+/* The Arduino manages 7 keys per satellite board but only 6 piano keys are systematically connected. 
+   For 2 boards the 7th key is connected:
+   - Board 0:  Arduino key 6 is mapped to piano key 0 which is the leftmost key.
+   - Board 6:  Arduino key 48 is mapped to piano key 85 which is the pedal.
+   This function does the mapping between Arduino keys and Piano keys.
+   Board:         0                     1                       12                    13
+   Arduino keys:  0  1  2  3  4  5  6   7  8  9 10 11 12 13 ... 84 85 86 87 88 89 90  91 92 93 94 95 96 97 
+   Piano keys:    1  2  3  4  5  6  0   7  8  9 10 11 12 NC ... 73 74 75 76 77 78 NC  79 80 81 82 83 84 NC
    NC stands for Not Connected. 
    */
 uint16_t arduino_to_piano_key_index(uint16_t key_index_arduino)
 {
-    uint16_t key_index_piano = key_index_arduino - (key_index_arduino / 7);
-
+    uint16_t key_index_piano; 
+    
+    if (key_index_arduino == 6)
+    {
+        key_index_piano = 0;
+    } 
+    else if (key_index_arduino == 48)
+    {
+        key_index_piano = PEDAL_KEY_IDX;
+    } 
+    else 
+    {
+        key_index_piano = key_index_arduino + 1 - (key_index_arduino / 7);
+    }
+    
     return(key_index_piano);
 }
 
@@ -559,6 +594,20 @@ void toggle_right_led(void)
     hw.SetLed(led_state);
 }
 
+void display_note_data(uint16_t idx) 
+{
+    size_t first_pos = notes[idx].first_sample_pos;
+
+    hw.Print("idx=%d ", idx);
+    hw.Print("playing=%d ", notes[idx].playing);
+    hw.Print("key_up=%d ", notes[idx].key_up);
+    // hw.Print("first_pos=%d ", notes[idx].first_sample_pos);
+    hw.Print("last_pos=%d ", notes[idx].last_sample_pos - first_pos);
+    hw.Print("cur_pos=%d ", notes[idx].cur_playing_pos - first_pos);
+    hw.Print("kup_pos=%d ", notes[idx].key_up_pos - first_pos);
+    hw.PrintLine("pup_pos=%d", notes[idx].pedal_up_pos - first_pos);
+}
+
 /* Main program */
 int main(void)
 {
@@ -571,7 +620,13 @@ int main(void)
     TNoteData *pCurNote;
 
     // Initialise global variables
+    pedal_up = true;
     memset(notes, 0, sizeof(notes));
+    for (size_t idx = 0; idx < NB_KEYS; idx++)
+    {
+        notes[idx].key_up = true;
+        notes[idx].volume = 0.0;
+    }
     memset(wav_file_name_list, 0, sizeof(wav_file_name_list));
 
     // Initialise hardware
@@ -623,27 +678,50 @@ int main(void)
             {
                 toggle_right_led();
 
-                pCurNote = &notes[key_index];
-                
-                if (msg_type == KEY_DOWN_MSG) 
+                if (key_index != PEDAL_KEY_IDX)
                 {
-                    hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
+                    pCurNote = &notes[key_index];
+                    
+                    if (msg_type == KEY_DOWN_MSG) 
+                    {
+                        hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
 
-                    pCurNote->volume = compute_volume(attack_time);
-                    hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
+                        pCurNote->volume = compute_volume(attack_time);
+                        hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
 
-                    pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
-                    pCurNote->playing = true;
-                    pCurNote->released = false;
+                        pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
+                        pCurNote->key_up = false;
+                        pCurNote->playing = true;
+                    } 
+                    else if (msg_type == KEY_UP_MSG) 
+                    {
+                        hw.PrintLine("KEY_UP index=%d", key_index);
+                        pCurNote->key_up_pos = pCurNote->cur_playing_pos;
+                        pCurNote->key_up = true;
+                    }
                 } 
-                else if (msg_type == KEY_UP_MSG) 
+                else // key_index == PEDAL_KEY_IDX
                 {
-                    hw.PrintLine("KEY_UP index=%d", key_index);
-                    pCurNote->release_pos = pCurNote->cur_playing_pos;
-                    pCurNote->released = true;
+                    if (msg_type == KEY_DOWN_MSG) 
+                    {
+                        hw.PrintLine("PEDAL_DOWN");
+                        pedal_up = false;
+                        for (uint16_t idx = 0; idx < NB_KEYS; idx++)
+                        {
+                            notes[idx].pedal_up_pos = notes[idx].first_sample_pos;
+                        }
+                    } 
+                    else if (msg_type == KEY_UP_MSG) 
+                    {
+                        hw.PrintLine("PEDAL_UP");
+                        for (uint16_t idx = 0; idx < NB_KEYS; idx++)
+                        {
+                            notes[idx].pedal_up_pos = notes[idx].cur_playing_pos;
+                        }
+                        pedal_up = true;
+                    }
                 }
             }
         } // if (result == 0)
     } // while(true)
-
 } // int main(void)
