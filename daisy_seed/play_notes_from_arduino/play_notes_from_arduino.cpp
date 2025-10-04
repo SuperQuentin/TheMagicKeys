@@ -2,7 +2,9 @@
 * This program:
 * - reads wav files from a SD card directory (one wav file per note).
 * - loads the wav data samples in external RAM memory (65 Mbytes).
-* - manages the simple communication protocol with the Arduino (note_on, note_off).
+* - manages a simple communication protocol with the Arduino (note_on, note_off).
+* - plays the notes.
+* - takey into account the pedal.
 *
 * The release of the key is managed by a linear decrease of the signal amplitude (~250 milliseconds).
 * To avoid a click sound at the note start (a.k.a. attack) a linear increase of the signal 
@@ -24,20 +26,20 @@ using namespace daisy;
 // Notes, samples and keys
 #define NB_KEYS                     85      // Number of keys and notes.
 #define MAX_NB_SIMULTANEOUS_NOTES   10      // 10 notes at 100% volume can be played without saturation.
-#define WAV_ENV_START_MS            10      // Wav enveloppe beginning in milliseconds. 
-#define WAV_ENV_END_MS              250     // Wav enveloppe end in milliseconds.
+#define WAV_ENV_START_MS            10      // Wav enveloppe for the attack in milliseconds. 
+#define WAV_ENV_END_MS              250     // Wav enveloppe for the release in milliseconds.
 #define SAMPLE_RATE_HZ              44000   // Hertz
-#define WAV_ENV_START_NB_SAMPLES    ((SAMPLE_RATE_HZ * WAV_ENV_START_MS) / 1000)
-#define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000) 
-#define MAX_ATTACK_TIME             100000  // Maximum key velocity.
-#define MIN_ATTACK_TIME             10000   // Minimum key velocity.
+#define MAX_ATTACK_TIME             100000  // Maximum key velocity (arbitrary unit based on arduino time).
+#define MIN_ATTACK_TIME             10000   // Minimum key velocity (arbitrary unit based on arduino time).
 #define PEDAL_KEY_IDX               85      // We consider for convenience that the pedal key is the 86th key.
+#define WAV_ENV_START_NB_SAMPLES    ((SAMPLE_RATE_HZ * WAV_ENV_START_MS) / 1000) // Conversion from ms to nb of samples
+#define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000)   // Conversion from ms to nb of samples
 
 // Wav files on the SD card
 #define MAX_FILE_NAME_LEN 40
 #define MAX_FILE_PATH_LEN 200
 #define WAV_FILE_PATH "/piano_wav/current"
-#define MAX_WAV_DATA_SIZE_BYTES (60*1000*1000)
+#define MAX_WAV_DATA_SIZE_BYTES (60*1000*1000) // 60 Mbytes 
 #define MAX_WAV_DATA_SIZE_WORD (MAX_WAV_DATA_SIZE_BYTES / 2)
 
 // Message received from arduino
@@ -62,7 +64,7 @@ typedef struct
     float volume;            // Define the amplification wich depends on the attack time.
 } TNoteData;
 
-bool pedal_up;               // Define if the pedal is up.
+bool pedal_up;               // Define if the pedal is up or down.
 
 // Message received from arduino
 typedef enum {KEY_UP_MSG, KEY_DOWN_MSG} e_msg_type;
@@ -70,17 +72,25 @@ typedef enum {KEY_UP_MSG, KEY_DOWN_MSG} e_msg_type;
 /*************************************************************************************************
 * Variables
 *************************************************************************************************/
-// Daisy hardware
+// Daisy Seed hardware
 DaisySeed      hw;
 
-// Variables to read and load the wav files
+// Variables containing all the wav file names on the SD card.
 char           wav_file_name_list[NB_KEYS * MAX_FILE_NAME_LEN];
 
 // Buffer in external RAM containing all the samples
 int16_t        DSY_SDRAM_BSS sample_data[MAX_WAV_DATA_SIZE_WORD];
 
-// Variable defining all the notes 
+// Variable defining all the notes. 
 TNoteData      notes[NB_KEYS];
+
+/*************************************************************************************************
+* Local functions declaration
+*************************************************************************************************/
+uint16_t arduino_to_piano_key_index(uint16_t key_index_arduino);
+void toggle_right_led(void);
+float compute_volume(uint32_t attack_time);
+size_t read_wav_file(char *file_name, uint8_t* ram_address);
 
 /*************************************************************************************************
 * Code
@@ -102,7 +112,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
     // Several samples must be generated.
     for(size_t block_idx = 0; block_idx < size; block_idx += 2)
     {
-        sig_float = 0; // The signal value.
+        sig_float = 0; // Initialize the signal value.
         
         // Scan all the notes of the notes array.
         for (size_t note_idx = 0; note_idx < NB_KEYS; note_idx++)
@@ -134,12 +144,16 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                 // It is a linear wav enveloppe applied at the note end.
                 if ((pCurNote->key_up == true) && (pedal_up == true))
                 {
+                    // Take into account the position when the pedal or the key was up
+                    // depending on the time order.
                     if (pCurNote->key_up_pos < pCurNote->pedal_up_pos)
                     {
+                        // The pedal was up after the key.
                         release_pos = pCurNote->pedal_up_pos;
                     }
                     else
                     {
+                        // The key was up after the pedal.
                         release_pos = pCurNote->key_up_pos;
                     }
 
@@ -147,17 +161,17 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                          (pCurNote->cur_playing_pos >= pCurNote->last_sample_pos) 
                        )
                     {
-                        // End of the note -> Note: data re-initialisation.
+                        // End of the relase or end of the note -> data re-initialisation.
                         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
-                        pCurNote->key_up_pos = pCurNote->first_sample_pos;
-                        pCurNote->pedal_up_pos = pCurNote->first_sample_pos;
-                        release_factor = 0.0;
-                        pCurNote->key_up = false;
-                        pCurNote->playing = false;
+                        pCurNote->key_up_pos      = pCurNote->first_sample_pos;
+                        pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
+                        release_factor            = 0.0;
+                        pCurNote->key_up          = false;
+                        pCurNote->playing         = false;
                     }
                     else
                     {
-                        // Release factor
+                        // Compute the release factor
                         release_factor = (float)(release_pos + WAV_ENV_END_NB_SAMPLES - pCurNote->cur_playing_pos);
                         release_factor /= (float)WAV_ENV_END_NB_SAMPLES;
                     }
@@ -186,7 +200,22 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
     } // for(size_t block_idx
 }
 
-// Mount the SD card
+/* Initialise global variables */
+void initialize_global_variables(void)
+{
+    pedal_up = true;
+    
+    // We consider that fields of type bool are false when set to 0.
+    memset(notes, 0, sizeof(notes));
+    for (size_t idx = 0; idx < NB_KEYS; idx++)
+    {
+        notes[idx].key_up = true;
+        notes[idx].volume = 0.0;
+    }
+    memset(wav_file_name_list, 0, sizeof(wav_file_name_list));
+}
+
+/* Mount the SD card */
 void mount_sd_card(void)
 {
     FRESULT result;
@@ -210,61 +239,7 @@ void mount_sd_card(void)
     }
 }
 
-// Read the wav data of the wav file. Copy the data at RAM address ram_address.
-// Return the wav data size (in bytes).
-size_t read_wav_file(char *file_name, uint8_t* ram_address)
-{
-    static FIL SDFile;
-    static WavFileInfo wav_file_info;
-    size_t bytesRead;
-    FRESULT result;
-    size_t wav_data_size = 0;
-
-    // Read wav file info (file siye and size to skip to reach sample data)
-    result = f_open(&SDFile, file_name, FA_READ);
-    if (result == FR_OK)
-    {
-        result = f_read(&SDFile, (void *)&wav_file_info.raw_data, sizeof(WAV_FormatTypeDef), &bytesRead);
-        if (result != FR_OK)
-        {
-            hw.PrintLine("f_read result KO. result=%d", result);
-        }
-        f_close(&SDFile);
-    }
-    else
-    {
-        hw.PrintLine("f_open result KO. result=%d", result);
-    }
-
-    // Read wav file data
-    uint32_t file_size = wav_file_info.raw_data.FileSize;
-    uint32_t size_to_skip = sizeof(WAV_FormatTypeDef) + wav_file_info.raw_data.SubChunk1Size;
-
-    result = f_open(&SDFile, file_name, FA_READ);
-
-    if (result == FR_OK)
-    {
-        f_lseek(&SDFile, size_to_skip);
-
-        result = f_read(&SDFile, ram_address, file_size - size_to_skip, &bytesRead);
-        if (result != FR_OK)
-        {
-            hw.PrintLine("f_read result KO. result=%d", result);
-        }
-    
-        f_close(&SDFile);
-
-        wav_data_size = bytesRead;
-    }
-    else
-    {
-        hw.PrintLine("f_open result KO. result=%d", result);
-    }
-
-    return(wav_data_size);
-}
-
-// Build a list of all wav files name in the wav directory of the SD card. 
+/* Build a list of all wav files name in the wav directory of the SD card. */
 void build_wav_file_name_list(void)
 {
     DIR     dir;
@@ -342,8 +317,8 @@ void build_wav_file_name_list(void)
     f_closedir(&dir);
 }
 
-// Read and load the wav file data in external RAM. One file per note.
-// Update the notes array with the start and end position in RAM of each note.
+/* Read and load the wav file data in external RAM. One file per note.
+   Update the notes array fields first_sample_pos, last_sample_pos, nb_samples... */
 void load_wav_files_in_ram(void)
 {
     char file_path_and_name[MAX_FILE_PATH_LEN];
@@ -371,6 +346,8 @@ void load_wav_files_in_ram(void)
         pCurNote->first_sample_pos = start_note_word_pos;
         pCurNote->nb_samples = wav_data_size_bytes / 2; // bytes to word size
         pCurNote->last_sample_pos = pCurNote->first_sample_pos + pCurNote->nb_samples;
+        
+        // Initialise some fields with the first sample position.
         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
         pCurNote->key_up_pos      = pCurNote->first_sample_pos;
         pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
@@ -454,6 +431,228 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
     return result;
 }
 
+/* Analyze messages received from Arduino. */
+int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, e_msg_type *p_msg_type, uint32_t* p_time)
+{
+    int result = 0;
+    int result_2 = 0;
+    uint8_t msg_len = strlen(msg_rec) - 2; // Remove the 2 end message characters (0x0d and 0x0a).
+    char temp_str[MAX_MESSAGE_SIZE];
+    int temp_int;
+    uint32_t time;
+    uint16_t key_index;
+    
+    *p_time = 0;
+
+    if (msg_rec[0] == 'D')
+    {
+        // Message type
+        *p_msg_type = KEY_DOWN_MSG;
+
+        // Key index
+        strncpy(temp_str, &msg_rec[2], 2);
+        temp_str[2] = 0;
+        result_2 = sscanf(temp_str, "%d", &temp_int);
+        key_index = temp_int;
+        if (result_2 != 1)
+        {
+            hw.PrintLine("Error: Problem to convert key_index received");
+            result = -1;
+        }
+        *p_key_index = arduino_to_piano_key_index(key_index);
+        
+        // Attack time
+        strncpy(temp_str, &msg_rec[4], msg_len - 4);
+        temp_str[msg_len] = 0;
+        result_2 = sscanf(temp_str, "%ld", &time);
+        if (result_2 != 1)
+        {
+            hw.PrintLine("Error: Problem to convert time received");
+            result = -1;
+        }
+        *p_time = time;
+    }
+    else if (msg_rec[0] == 'U')
+    {
+        // Message type
+        *p_msg_type = KEY_UP_MSG;
+
+        // Key index
+        strncpy(temp_str, &msg_rec[2], 2);
+        temp_str[2] = 0;
+        result_2 = sscanf(temp_str, "%d", &temp_int);
+        key_index = temp_int;
+        if (result_2 != 1)
+        {
+            hw.PrintLine("Error: Problem to convert key_index received");
+            result = -1;
+        }
+        *p_key_index = arduino_to_piano_key_index(key_index);
+    }
+    else
+    {
+        hw.PrintLine("Error: Unknown message received");
+        result = -1;
+    }
+
+    return result;
+}
+
+/* This function manages the messages received (KEY_UP_MSG, KEY_DOWN_MSG).
+   It works in collaboration with function AudioCallback which is called in parallel. 
+   Be careful, as AudioCallback is called asynchronously, the order in which variables 
+   are set can matter.
+*/
+void manage_msg_received(uint16_t key_index, e_msg_type msg_type, uint32_t attack_time)
+{
+    TNoteData *pCurNote;
+    uint16_t idx;
+
+    toggle_right_led();
+
+    if (key_index != PEDAL_KEY_IDX)
+    {
+        // A key from the keyboard has changed state.
+        pCurNote = &notes[key_index];
+        
+        if (msg_type == KEY_DOWN_MSG) 
+        {
+            // The key is down
+            hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
+
+            pCurNote->volume = compute_volume(attack_time);
+            hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
+
+            pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
+            pCurNote->key_up = false;
+
+            // Start the note playing by the AudioCallback function.
+            pCurNote->playing = true;
+        } 
+        else if (msg_type == KEY_UP_MSG) 
+        {
+            // The key is up
+            hw.PrintLine("KEY_UP index=%d", key_index);
+            pCurNote->key_up_pos = pCurNote->cur_playing_pos;
+            pCurNote->key_up = true;
+        }
+    } 
+    else // key_index == PEDAL_KEY_IDX
+    {
+        // The pedal has changed state.
+        if (msg_type == KEY_DOWN_MSG) 
+        {
+            // The pedal is down
+            hw.PrintLine("PEDAL_DOWN");
+            pedal_up = false;
+            
+            // The position is reinitialised for all notes (different position for ech note).
+            for (idx = 0; idx < NB_KEYS; idx++)
+            {
+                notes[idx].pedal_up_pos = notes[idx].first_sample_pos;
+            }
+        } 
+        else if (msg_type == KEY_UP_MSG) 
+        {
+            // The pedal is up
+            hw.PrintLine("PEDAL_UP");
+
+            // The position when the pedal is up is set for all notes (different positions for 
+            // each note).
+            for (idx = 0; idx < NB_KEYS; idx++)
+            {
+                notes[idx].pedal_up_pos = notes[idx].cur_playing_pos;
+            }
+            pedal_up = true;
+        }
+    }
+}
+
+/*  This function executes the main forever loop of this program. 
+    This function:
+    - Receives messages for the Arduino.
+    - Analyse messages.
+    - Manage messages received.
+*/
+void play_notes_received_from_arduino(UartHandler* p_uart)
+{
+    char msg_rec[MAX_MESSAGE_SIZE];
+    int result = 0;
+    uint16_t key_index;
+    e_msg_type msg_type;
+    uint32_t attack_time;
+
+    // Receive messages from UART
+    while(true)
+    {
+        result = receive_msg_on_uart(p_uart, msg_rec);
+        if (result == 0)
+        {   
+            result = analyze_msg_received(msg_rec, &key_index, &msg_type, &attack_time);
+
+            if (result == 0)
+            {
+                manage_msg_received(key_index, msg_type, attack_time);
+            
+            } // if (result == 0)
+        } // if (result == 0)
+    } // while(true)
+}
+
+/* Read the wav data of a wav file. Copy the data at RAM address ram_address.
+   Return the wav data size (in bytes). */
+size_t read_wav_file(char *file_name, uint8_t* ram_address)
+{
+    static FIL SDFile;
+    static WavFileInfo wav_file_info;
+    size_t bytesRead;
+    FRESULT result;
+    size_t wav_data_size = 0;
+
+    // Read wav file info (file size and size to skip to reach sample data)
+    result = f_open(&SDFile, file_name, FA_READ);
+    if (result == FR_OK)
+    {
+        result = f_read(&SDFile, (void *)&wav_file_info.raw_data, sizeof(WAV_FormatTypeDef), &bytesRead);
+        if (result != FR_OK)
+        {
+            hw.PrintLine("f_read result KO. result=%d", result);
+        }
+        f_close(&SDFile);
+    }
+    else
+    {
+        hw.PrintLine("f_open result KO. result=%d", result);
+    }
+
+    // Read wav file data
+    uint32_t file_size = wav_file_info.raw_data.FileSize;
+    uint32_t size_to_skip = sizeof(WAV_FormatTypeDef) + wav_file_info.raw_data.SubChunk1Size;
+
+    result = f_open(&SDFile, file_name, FA_READ);
+
+    if (result == FR_OK)
+    {
+        f_lseek(&SDFile, size_to_skip);
+
+        result = f_read(&SDFile, ram_address, file_size - size_to_skip, &bytesRead);
+        if (result != FR_OK)
+        {
+            hw.PrintLine("f_read result KO. result=%d", result);
+        }
+    
+        f_close(&SDFile);
+
+        wav_data_size = bytesRead;
+    }
+    else
+    {
+        hw.PrintLine("f_open result KO. result=%d", result);
+    }
+
+    return(wav_data_size);
+}
+
 /* The Arduino manages 7 keys per satellite board but only 6 piano keys are systematically connected. 
    For 2 boards the 7th key is connected:
    - Board 0:  Arduino key 6 is mapped to piano key 0 which is the leftmost key.
@@ -482,72 +681,6 @@ uint16_t arduino_to_piano_key_index(uint16_t key_index_arduino)
     }
     
     return(key_index_piano);
-}
-
-int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, e_msg_type *p_msg_type, uint32_t* p_time)
-{
-    int result = 0;
-    int result_2 = 0;
-    uint8_t msg_len = strlen(msg_rec) - 2; // Remove the 2 end of message characters (0x0d and 0x0a).
-    char temp_str[MAX_MESSAGE_SIZE];
-    int temp_int;
-    uint32_t time;
-    uint16_t key_index;
-    
-    *p_time = 0;
-
-    if (msg_rec[0] == 'D')
-    {
-        // Message type
-        *p_msg_type = KEY_DOWN_MSG;
-
-        // key_index
-        strncpy(temp_str, &msg_rec[2], 2);
-        temp_str[2] = 0;
-        result_2 = sscanf(temp_str, "%d", &temp_int);
-        key_index = temp_int;
-        if (result_2 != 1)
-        {
-            hw.PrintLine("Error: Problem to convert key_index received");
-            result = -1;
-        }
-        *p_key_index = arduino_to_piano_key_index(key_index);
-        
-        // time
-        strncpy(temp_str, &msg_rec[4], msg_len - 4);
-        temp_str[msg_len] = 0;
-        result_2 = sscanf(temp_str, "%ld", &time);
-        if (result_2 != 1)
-        {
-            hw.PrintLine("Error: Problem to convert time received");
-            result = -1;
-        }
-        *p_time = time;
-    }
-    else if (msg_rec[0] == 'U')
-    {
-        // Message type
-        *p_msg_type = KEY_UP_MSG;
-
-        // key_index
-        strncpy(temp_str, &msg_rec[2], 2);
-        temp_str[2] = 0;
-        result_2 = sscanf(temp_str, "%d", &temp_int);
-        key_index = temp_int;
-        if (result_2 != 1)
-        {
-            hw.PrintLine("Error: Problem to convert key_index received");
-            result = -1;
-        }
-        *p_key_index = arduino_to_piano_key_index(key_index);
-    }
-    else
-    {
-        hw.PrintLine("Error: Unknown message received");
-        result = -1;
-    }
-
-    return result;
 }
 
 /* Compute the amplification factor which depends on the attack_time
@@ -581,7 +714,7 @@ float compute_volume(uint32_t attack_time)
         amp_factor = 0.1f;
     }
 
-    return amp_factor;
+    return amp_factor; 
 }
 
 /* Toggle the right LED state */
@@ -594,6 +727,8 @@ void toggle_right_led(void)
     hw.SetLed(led_state);
 }
 
+/* Display notes data. Useful for debugging.
+   Positions are displayed relatively to the first position.*/
 void display_note_data(uint16_t idx) 
 {
     size_t first_pos = notes[idx].first_sample_pos;
@@ -611,23 +746,10 @@ void display_note_data(uint16_t idx)
 /* Main program */
 int main(void)
 {
-    char msg_rec[MAX_MESSAGE_SIZE];
-    int result = 0;
-    uint16_t key_index;
-    e_msg_type msg_type;
-    uint32_t attack_time;
     UartHandler uart;
-    TNoteData *pCurNote;
 
     // Initialise global variables
-    pedal_up = true;
-    memset(notes, 0, sizeof(notes));
-    for (size_t idx = 0; idx < NB_KEYS; idx++)
-    {
-        notes[idx].key_up = true;
-        notes[idx].volume = 0.0;
-    }
-    memset(wav_file_name_list, 0, sizeof(wav_file_name_list));
+    initialize_global_variables();
 
     // Initialise hardware
     hw.Init();
@@ -654,74 +776,21 @@ int main(void)
     load_wav_files_in_ram();
 
     // Initialize UART
+    hw.PrintLine("Initializing UART...");
+    toggle_right_led();
     initialize_uart(&uart);
     flush_uart(&uart);
 
 	// Prepare and start the audio call back
+    hw.PrintLine("Preparing and starting audio call back ...");
+    toggle_right_led();
     hw.SetAudioBlockSize(4); // number of samples handled per callback
 	hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 	hw.StartAudio(AudioCallback);
     
     // Play notes received from arduino.
-    hw.PrintLine("Play notes received from arduino...");
+    hw.PrintLine("Playing notes received from arduino...");
     toggle_right_led();
+    play_notes_received_from_arduino(&uart);
 
-    // Receive messages from UART
-    while(true)
-    {
-        result = receive_msg_on_uart(&uart, msg_rec);
-        if (result == 0)
-        {   
-            result = analyze_msg_received(msg_rec, &key_index, &msg_type, &attack_time);
-
-            if (result == 0)
-            {
-                toggle_right_led();
-
-                if (key_index != PEDAL_KEY_IDX)
-                {
-                    pCurNote = &notes[key_index];
-                    
-                    if (msg_type == KEY_DOWN_MSG) 
-                    {
-                        hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
-
-                        pCurNote->volume = compute_volume(attack_time);
-                        hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
-
-                        pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
-                        pCurNote->key_up = false;
-                        pCurNote->playing = true;
-                    } 
-                    else if (msg_type == KEY_UP_MSG) 
-                    {
-                        hw.PrintLine("KEY_UP index=%d", key_index);
-                        pCurNote->key_up_pos = pCurNote->cur_playing_pos;
-                        pCurNote->key_up = true;
-                    }
-                } 
-                else // key_index == PEDAL_KEY_IDX
-                {
-                    if (msg_type == KEY_DOWN_MSG) 
-                    {
-                        hw.PrintLine("PEDAL_DOWN");
-                        pedal_up = false;
-                        for (uint16_t idx = 0; idx < NB_KEYS; idx++)
-                        {
-                            notes[idx].pedal_up_pos = notes[idx].first_sample_pos;
-                        }
-                    } 
-                    else if (msg_type == KEY_UP_MSG) 
-                    {
-                        hw.PrintLine("PEDAL_UP");
-                        for (uint16_t idx = 0; idx < NB_KEYS; idx++)
-                        {
-                            notes[idx].pedal_up_pos = notes[idx].cur_playing_pos;
-                        }
-                        pedal_up = true;
-                    }
-                }
-            }
-        } // if (result == 0)
-    } // while(true)
 } // int main(void)
