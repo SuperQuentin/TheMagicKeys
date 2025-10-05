@@ -62,6 +62,7 @@ typedef struct
     size_t key_up_pos;       // Define the position where the key was released.
     size_t pedal_up_pos;     // Define the position where the pedal was released.
     float volume;            // Define the amplification wich depends on the attack time.
+    bool note_end_soon;      // Define if the note is reaching the end of the sample.
 } TNoteData;
 
 bool pedal_up;               // Define if the pedal is up or down.
@@ -112,7 +113,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
     // Several samples must be generated.
     for(size_t block_idx = 0; block_idx < size; block_idx += 2)
     {
-        sig_float = 0; // Initialize the signal value.
+        sig_float = 0.0; // Initialize the signal value.
         
         // Scan all the notes of the notes array.
         for (size_t note_idx = 0; note_idx < NB_KEYS; note_idx++)
@@ -138,11 +139,21 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                     note_sig_float *= attack_factor;
                 }
 
-                // Release
-                // At the end of the release the notes data are re-initialised.
-                // The release factor allows a more natural sound at key release.
-                // It is a linear wav enveloppe applied at the note end.
-                if ((pCurNote->key_up == true) && (pedal_up == true))
+                /* Before the note end, we simulate a normal release to avoid a click sound */
+                if (   (pCurNote->last_sample_pos - pCurNote->cur_playing_pos <= WAV_ENV_END_NB_SAMPLES)
+                    && (pCurNote->note_end_soon == false) )
+                {
+                    pCurNote->note_end_soon = true;
+                    pCurNote->key_up_pos    = pCurNote->cur_playing_pos;
+                    pCurNote->pedal_up_pos  = pCurNote->cur_playing_pos;
+                }
+
+                /* Release
+                   At the end of the release the notes data are re-initialised. The release factor 
+                   allows a more natural sound at key release (avoid a click sound).
+                   It is a linear wav enveloppe applied at the note end. */
+                if (   ((pCurNote->key_up == true) && (pedal_up == true))
+                    || (pCurNote->note_end_soon == true) )
                 {
                     // Take into account the position when the pedal or the key was up
                     // depending on the time order.
@@ -157,17 +168,17 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                         release_pos = pCurNote->key_up_pos;
                     }
 
-                    if ( (pCurNote->cur_playing_pos - release_pos > WAV_ENV_END_NB_SAMPLES) ||
-                         (pCurNote->cur_playing_pos >= pCurNote->last_sample_pos) 
-                       )
+                    if (pCurNote->cur_playing_pos - release_pos > WAV_ENV_END_NB_SAMPLES)
                     {
-                        // End of the relase or end of the note -> data re-initialisation.
+                        // End of the release or end of the note -> data re-initialisation.
                         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
                         pCurNote->key_up_pos      = pCurNote->first_sample_pos;
                         pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
-                        release_factor            = 0.0;
-                        pCurNote->key_up          = false;
                         pCurNote->playing         = false;
+                        pCurNote->key_up          = false;
+                        pCurNote->note_end_soon   = false;
+                        pCurNote->volume          = 0.0;
+                        release_factor            = 0.0;
                     }
                     else
                     {
@@ -524,7 +535,10 @@ void manage_msg_received(uint16_t key_index, e_msg_type msg_type, uint32_t attac
             hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
 
             pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
-            pCurNote->key_up = false;
+            pCurNote->key_up_pos      = pCurNote->first_sample_pos;
+            pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
+            pCurNote->key_up          = false;
+            pCurNote->note_end_soon   = false;
 
             // Start the note playing by the AudioCallback function.
             pCurNote->playing = true;
