@@ -92,6 +92,7 @@ uint16_t arduino_to_piano_key_index(uint16_t key_index_arduino);
 void toggle_right_led(void);
 float compute_volume(uint32_t attack_time);
 size_t read_wav_file(char *file_name, uint8_t* ram_address);
+void display_all_notes_data(void);
 
 /*************************************************************************************************
 * Code
@@ -168,7 +169,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                         release_pos = pCurNote->key_up_pos;
                     }
 
-                    if (pCurNote->cur_playing_pos - release_pos > WAV_ENV_END_NB_SAMPLES)
+                    if (pCurNote->cur_playing_pos - release_pos >= WAV_ENV_END_NB_SAMPLES)
                     {
                         // End of the release or end of the note -> data re-initialisation.
                         pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
@@ -542,11 +543,13 @@ void manage_msg_received(uint16_t key_index, e_msg_type msg_type, uint32_t attac
 
             // Start the note playing by the AudioCallback function.
             pCurNote->playing = true;
+
         } 
         else if (msg_type == KEY_UP_MSG) 
         {
             // The key is up
             hw.PrintLine("KEY_UP index=%d", key_index);
+            
             pCurNote->key_up_pos = pCurNote->cur_playing_pos;
             pCurNote->key_up = true;
         }
@@ -741,7 +744,7 @@ void toggle_right_led(void)
     hw.SetLed(led_state);
 }
 
-/* Display notes data. Useful for debugging.
+/* Display data of a note. Useful for debugging.
    Positions are displayed relatively to the first position.*/
 void display_note_data(uint16_t idx) 
 {
@@ -755,6 +758,16 @@ void display_note_data(uint16_t idx)
     hw.Print("cur_pos=%d ", notes[idx].cur_playing_pos - first_pos);
     hw.Print("kup_pos=%d ", notes[idx].key_up_pos - first_pos);
     hw.PrintLine("pup_pos=%d", notes[idx].pedal_up_pos - first_pos);
+}
+
+/* Display data of all notes. Useful for debugging.
+   Positions are displayed relatively to the first position.*/
+void display_all_notes_data(void)
+{
+    for( uint16_t idx=0; idx<NB_KEYS; idx++)
+    {
+        display_note_data(idx);
+    }
 }
 
 /* Main program */
