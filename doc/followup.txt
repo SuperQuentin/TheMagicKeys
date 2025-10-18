@@ -1,8 +1,6 @@
 **** TODO ****
-- Investigate issue: 2 sat. boards not readable.
-- Investigate issue: sometimes the main board does not start properly.
-- [Main board software]Add pedal management.
-- Buy a power supply. 
-- [Hardware] Connect Key 85 + Pedal.
-- Design volume adjustement button.
-- Design mode adjustement button.
+
+**** Next travel to Bôches ****
+- Make/Connect 2 flat cables.
+- Make/Connect the 2 pedals.
+- Make/Connect key number 85.
