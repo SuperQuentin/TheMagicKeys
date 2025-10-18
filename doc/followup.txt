@@ -1,6 +1,23 @@
 **** TODO ****
+- Add program selection.
 
 **** Next travel to Bôches ****
 - Make/Connect 2 flat cables.
 - Make/Connect the 2 pedals.
 - Make/Connect key number 85.
+
+**** Add program selection ****
+
+** Design **
+At startup, if the 2 pedals are down:
+- Play sound "Choisissez un programme SVP"
+- Waits for a key down
+- Reads key index
+- Sound "Programme X démarre"
+- Write current program on SD card
+- Read notes of current program
+- Play sound "Prêt"
+
+At startup, if the 2 pedals are not down:
+- Read the current program on SD card.
+- Read notes of current program

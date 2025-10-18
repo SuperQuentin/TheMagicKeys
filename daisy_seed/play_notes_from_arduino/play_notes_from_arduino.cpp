@@ -45,10 +45,13 @@ using namespace daisy;
 // Wav files on the SD card
 #define MAX_FILE_NAME_LEN 40
 #define MAX_FILE_PATH_LEN 200
-#define WAV_NOTES_FILE_PATH "/piano_wav/prog_1"
+#define WAV_NOTES_BASE_FILE_PATH "/piano_wav"
 #define WAV_SPECIAL_SOUNDS_FILE_PATH "/piano_wav/special"
 #define MAX_WAV_DATA_SIZE_BYTES (60*1000*1000) // 60 Mbytes 
 #define MAX_WAV_DATA_SIZE_WORD (MAX_WAV_DATA_SIZE_BYTES / 2)
+
+// File defining the current program
+#define CURRENT_PROG_FILE_PATH "/piano_wav/current_prog"
 
 // Message received from arduino
 #define MAX_MESSAGE_SIZE 20
@@ -266,8 +269,23 @@ void mount_sd_card(void)
     }
 }
 
+/* Build the full path where the note wav files are located */
+void build_notes_wav_file_path(uint8_t prog_idx, char* path_str)
+{
+    char prog_index_str[3];
+    
+    // Convert program index into a string
+    itoa(prog_idx, prog_index_str, 10);
+
+    // Build the full path
+    strcpy(path_str, WAV_NOTES_BASE_FILE_PATH);
+    strcat(path_str, "/");
+    strcat(path_str, "prog_");
+    strcat(path_str, prog_index_str);    
+}
+
 /* Build a list of all wav files name in the wav directory of the SD card containing notes. */
-void build_notes_wav_notes_file_name_list(void)
+void build_notes_wav_notes_file_name_list(uint8_t prog_idx)
 {
     DIR     dir;
     FRESULT result;
@@ -277,7 +295,8 @@ void build_notes_wav_notes_file_name_list(void)
     char index_str[4];
     uint16_t nb_wav_files = 0;
 
-    strcpy(search_path, WAV_NOTES_FILE_PATH);
+    // Build the search path
+    build_notes_wav_file_path(prog_idx, search_path);
     hw.PrintLine("search_path=%s", search_path);
 
     // Open the directory containing the wav files.
@@ -393,7 +412,7 @@ size_t load_special_sounds_wav_files_in_ram(void)
 /* Read and load the notes wav file data in external RAM. One file per note.
    After special sounds in external RAM.
    Update the sounds array fields first_sample_pos, last_sample_pos, nb_samples... */
-void load_notes_wav_files_in_ram(size_t first_note_pos)
+void load_notes_wav_files_in_ram(size_t first_note_pos, uint8_t prog_idx)
 {
     char file_path_and_name[MAX_FILE_PATH_LEN];
     size_t wav_data_size_bytes = 0;
@@ -406,8 +425,8 @@ void load_notes_wav_files_in_ram(size_t first_note_pos)
         // Current note data
         pCurNote = &sounds[NB_SPECIAL_SOUNDS + file_idx];
 
-        // Build the full file path name
-        strcpy(file_path_and_name, WAV_NOTES_FILE_PATH);
+        // Build the full file path
+        build_notes_wav_file_path(prog_idx, file_path_and_name);
         strcat(file_path_and_name, "/");
         strcat(file_path_and_name, &wav_notes_file_name_list[file_idx * MAX_FILE_NAME_LEN]);
         hw.PrintLine("file_path_and_name=%s", file_path_and_name);
@@ -848,11 +867,73 @@ void display_all_sounds_data(void)
     }
 }
 
+/* Update the file defining the current program index. */
+void write_current_program(uint8_t prog_idx)
+{   
+    static FIL SDFile;
+    FRESULT result;
+    static UINT nb_bytes_written;
+    static uint8_t byte_to_write = prog_idx;
+    
+    result = f_open(&SDFile, CURRENT_PROG_FILE_PATH, FA_WRITE | FA_CREATE_ALWAYS);
+
+    if (result == FR_OK)
+    {
+        result = f_write(&SDFile, &byte_to_write, 1, &nb_bytes_written);
+        
+        if ((result != FR_OK) || (nb_bytes_written != 1))
+        {
+            hw.PrintLine("f_write result KO. result=%d nb_bytes_written=%d", result, nb_bytes_written);    
+        } 
+        
+        f_close(&SDFile);
+    }
+    else
+    {
+        hw.PrintLine("f_open result KO. result=%d", result);
+    }
+}
+
+/* Read the file defining the current program index. */
+uint8_t read_current_program(void)
+{
+    static FIL SDFile;
+    FRESULT result;
+    uint8_t cur_prog_idx = 1;
+    static uint8_t byte_read;
+    static UINT nb_bytes_read;
+
+    result = f_open(&SDFile, CURRENT_PROG_FILE_PATH, FA_READ);
+
+    if (result == FR_OK)
+    {
+        result = f_read(&SDFile, &byte_read, 1, &nb_bytes_read);
+
+        if ((result == FR_OK) && (nb_bytes_read == 1))
+        {
+            cur_prog_idx = byte_read;
+        } 
+        else
+        {
+            hw.PrintLine("f_read result KO. result=%d nb_bytes_read=%d", result, nb_bytes_read);    
+        }
+
+        f_close(&SDFile);
+    }
+    else
+    {
+        hw.PrintLine("f_open result KO. result=%d", result);
+    }
+
+    return cur_prog_idx;
+}
+
 /* Main program */
 int main(void)
 {
     UartHandler uart;
     size_t first_note_position;
+    uint8_t cur_prog_idx;
 
     // Initialise global variables
     initialize_global_variables();
@@ -863,7 +944,7 @@ int main(void)
 
     // Initialise serial log.
     // Set parameter to true to wait for the serial line connection.
-    hw.StartLog(true);
+    hw.StartLog(false);
     toggle_right_led();
 
     // Initialise and mount the SD card
@@ -871,20 +952,25 @@ int main(void)
     toggle_right_led();
     mount_sd_card();
 
-    // Build a sorted list of wav file name (one per note).
-    hw.PrintLine("Building the list of wav files...");
-    toggle_right_led();
-    build_notes_wav_notes_file_name_list();
+    // Read current prog
+    hw.PrintLine("Read current prog...");
+    cur_prog_idx = read_current_program();
+    hw.PrintLine("cur_prog_idx=%d", cur_prog_idx);
 
     // Read special wav files and load them in RAM.
     hw.PrintLine("Loading special wav files in RAM...");
     toggle_right_led();
     first_note_position = load_special_sounds_wav_files_in_ram();
 
-    // Read notes wav files and load them them RAM.
+    // Build a sorted list of wav file name (one per note).
+    hw.PrintLine("Building the list of wav files...");
+    toggle_right_led();
+    build_notes_wav_notes_file_name_list(cur_prog_idx);
+
+    // Read notes wav files and load them in RAM.
     hw.PrintLine("Loading notes wav files in RAM...");
     toggle_right_led();
-    load_notes_wav_files_in_ram(first_note_position);
+    load_notes_wav_files_in_ram(first_note_position, cur_prog_idx);
 
     // Initialize UART
     hw.PrintLine("Initializing UART...");
