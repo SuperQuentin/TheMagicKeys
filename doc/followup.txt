@@ -8,8 +8,8 @@
 
 **** Add program selection ****
 
-** Design **
-At startup, if the 2 pedals are down:
+** Design 1 **
+At startup, if the prog mode button is closed (J7):
 - Play sound "Choisissez un programme SVP"
 - Waits for a key down
 - Reads key index
@@ -18,6 +18,17 @@ At startup, if the 2 pedals are down:
 - Read notes of current program
 - Play sound "Prêt"
 
-At startup, if the 2 pedals are not down:
+At startup, if the prog mode button is opened (J7):
+- Read the current program on SD card.
+- Read notes of current program
+
+** Design 2 **
+At any time, if the prog mode button is closed (J7) and a key is down:
+- Play sound "Programme selectionné"
+- Write current program on SD card
+- Read notes of current program
+- Play sound "Prêt"
+
+At startup:
 - Read the current program on SD card.
 - Read notes of current program
