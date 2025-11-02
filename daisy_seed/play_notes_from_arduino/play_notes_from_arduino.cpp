@@ -58,6 +58,12 @@ using namespace daisy::seed;
 // Message received from arduino
 #define MAX_MESSAGE_SIZE 20
 
+// Enable/Disable logs when key up or down (value: 0 or 1).
+#define ENABLED_ALL_LOGS 1
+
+// Wait or not for the uart host connection (value: 0 or 1).
+#define WAIT_UART_HOST_CONNECTION_TO_START 0
+
 /*************************************************************************************************
 * Types
 *************************************************************************************************/
@@ -661,10 +667,12 @@ void manage_msg_received_in_normal_mode(uint16_t key_index, e_msg_type msg_type,
         if (msg_type == KEY_DOWN_MSG) 
         {
             // The key is down
-            g_hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
-
             pCurNote->volume = compute_volume(attack_time);
-            g_hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
+
+            #if (ENABLED_ALL_LOGS == 1)
+                g_hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
+                g_hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
+            #endif
 
             pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
             pCurNote->key_up_pos      = pCurNote->first_sample_pos;
@@ -679,8 +687,10 @@ void manage_msg_received_in_normal_mode(uint16_t key_index, e_msg_type msg_type,
         else if (msg_type == KEY_UP_MSG) 
         {
             // The key is up
-            g_hw.PrintLine("KEY_UP index=%d", key_index);
-            
+            #if (ENABLED_ALL_LOGS == 1)
+                g_hw.PrintLine("KEY_UP index=%d", key_index);
+            #endif
+           
             pCurNote->key_up_pos = pCurNote->cur_playing_pos;
             pCurNote->key_up = true;
         }
@@ -1066,7 +1076,7 @@ int main(void)
 
     // Initialise serial log.
     // Set parameter to true to wait for the serial line connection.
-    g_hw.StartLog(false);
+    g_hw.StartLog(WAIT_UART_HOST_CONNECTION_TO_START == 1);
     toggle_right_led();
 
     // Initialise and mount the SD card

@@ -1,35 +1,10 @@
 **** TODO ****
-- Add program selection.
+- Add a second bank of wav sounds.
+- Install at Bôches
+- Add modes with generated sounds.
 
-**** Next travel to Bôches ****
-- Make/Connect 2 flat cables.
-- Make/Connect the 2 pedals.
-- Make/Connect key number 85.
+**** Install at Bôches ****
+- Make/Connect 2 flat cables main board <->Satellite boards
+- Connect the 2 pedals.
+- Connect key number 85.
 
-**** Add program selection ****
-
-** Design 1 **
-At startup, if the prog mode button is closed (J7):
-- Play sound "Choisissez un programme SVP"
-- Waits for a key down
-- Reads key index
-- Sound "Programme X démarre"
-- Write current program on SD card
-- Read notes of current program
-- Play sound "Prêt"
-
-At startup, if the prog mode button is opened (J7):
-- Read the current program on SD card.
-- Read notes of current program
-
-** Design 2 **
-At any time, if the prog mode button is closed (J7) and a key is released:
-- Play sound "Programme en cours de chargement"
-- Write current program on SD card
-- Read notes of current program
-- Play sound "Prêt"
-
-At startup:
-- Read the current program on SD card.
-- Read notes of current program
-- Play sound "Prêt"
