@@ -37,8 +37,9 @@ using namespace daisy::seed;
 #define WAV_ENV_END_NB_SAMPLES      ((SAMPLE_RATE_HZ * WAV_ENV_END_MS) / 1000)   // Conversion from ms to nb of samples
 
 // Special sounds
-#define NB_SPECIAL_SOUNDS           1
+#define NB_SPECIAL_SOUNDS           2
 #define SOUND_READY_IDX             0
+#define SOUND_PROGRAM_CHARGING_IDX  1
 
 // Sounds
 #define NB_SOUNDS                   (NB_KEYS + NB_SPECIAL_SOUNDS)
@@ -116,6 +117,7 @@ size_t read_wav_file(char *file_name, uint8_t* ram_address);
 void display_all_sounds_data(void);
 uint8_t read_current_program(void);
 void write_current_program(uint8_t prog_idx);
+void play_special_sound(uint8_t sound_idx);
 
 /*************************************************************************************************
 * Code
@@ -252,6 +254,7 @@ void initialize_global_variables(void)
     // Special sounds
     memset(g_wav_special_sounds_file_name_list, 0, sizeof(g_wav_special_sounds_file_name_list));
     strcpy(&g_wav_special_sounds_file_name_list[0], "ready.wav");
+    strcpy(&g_wav_special_sounds_file_name_list[1 * MAX_FILE_NAME_LEN], "program_charging.wav");
 }
 
 /* Read the button controlling the programming mode (Jumper J7) */
@@ -497,12 +500,20 @@ void initialize_uart(UartHandler* p_uart)
 /* Flush UART */
 void flush_uart(UartHandler* p_uart)
 {
-    enum UartHandler::Result result = UartHandler::Result::OK;
+    enum UartHandler::Result result;
     uint8_t char_rec = 0;
     
-    while(result == UartHandler::Result::OK)
+    while(true)
     {
-        result = p_uart->BlockingReceive(&char_rec, 1, 10);
+        result = p_uart->BlockingReceive(&char_rec, 1, 1); // Timeout = 1 ms
+        if (result == UartHandler::Result::OK)
+        {
+            g_hw.PrintLine("Flush 1 character");
+        } 
+        else
+        {
+            break;
+        }
     }
 }
 
@@ -549,7 +560,6 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
 
         if (char_rec == 0x0a)
         {
-            g_hw.PrintLine("End of message received");
             break;
         } 
     
@@ -561,8 +571,6 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
     }
     
     msg_rec[char_idx] = 0; // Null terminated string
-
-    g_hw.PrintLine("End receive_msg_on_uart. result=%d char_idx=%d msg_rec=%s", result, char_idx, msg_rec);
 
     return result;
 }
@@ -719,6 +727,11 @@ void manage_msg_received_in_programming_mode(uint16_t key_index, e_msg_type msg_
 
     if (msg_type == KEY_UP_MSG) 
     {
+        // Play sound "Program charging"
+        g_hw.PrintLine("Play the sound program charging...");
+        play_special_sound(SOUND_PROGRAM_CHARGING_IDX);
+
+        // Compute program index and save it on SD card
         g_hw.PrintLine("Programming mode");
         prog_index = (key_index % 2) + 1;
         g_hw.PrintLine("Program index selected=%d", prog_index);
@@ -735,6 +748,10 @@ void manage_msg_received_in_programming_mode(uint16_t key_index, e_msg_type msg_
         g_hw.PrintLine("Loading notes wav files in RAM...");
         toggle_right_led();
         load_notes_wav_files_in_ram(prog_index);
+
+        // Play sound "Piano ready"
+        g_hw.PrintLine("Play the sound piano ready...");
+        play_special_sound(SOUND_READY_IDX);
     }
 }
 
@@ -1090,8 +1107,8 @@ int main(void)
 	g_hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 	g_hw.StartAudio(AudioCallback);
     
-    // Play the sound ready.
-    g_hw.PrintLine("Play the sound ready...");
+    // Play the sound "Piano ready".
+    g_hw.PrintLine("Play the sound piano ready...");
     toggle_right_led();
     play_special_sound(SOUND_READY_IDX);
 
