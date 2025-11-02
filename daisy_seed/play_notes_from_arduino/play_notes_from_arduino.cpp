@@ -64,7 +64,7 @@ using namespace daisy::seed;
 // Structure defining a sound (notes or special sounds)
 typedef struct
 {
-    // All ..._pos fields define positions in the buffer sample_data.
+    // All ..._pos fields define positions in the buffer g_sample_data.
     size_t first_sample_pos; // Position of the first sample of a note.
     size_t last_sample_pos;  // Position of the last sample of a note.
     size_t nb_samples;       // Number of samples of a note.
@@ -77,8 +77,6 @@ typedef struct
     bool sound_end_soon;     // Define if the note is reaching the end of the sample.
 } TSoundData;
 
-bool pedal_up;               // Define if the pedal is up or down.
-
 // Message received from arduino
 typedef enum {KEY_UP_MSG, KEY_DOWN_MSG} e_msg_type;
 
@@ -86,24 +84,27 @@ typedef enum {KEY_UP_MSG, KEY_DOWN_MSG} e_msg_type;
 * Variables
 *************************************************************************************************/
 // Daisy Seed hardware
-DaisySeed      hw;
+DaisySeed      g_hw;
 
 // Variables containing all the notes wav file names on the SD card.
-char           wav_notes_file_name_list[NB_KEYS * MAX_FILE_NAME_LEN];
+char           g_wav_notes_file_name_list[NB_KEYS * MAX_FILE_NAME_LEN];
 
 // Variables containing all the special sounds wav file names on the SD card.
-char           wav_special_sounds_file_name_list[NB_SPECIAL_SOUNDS * MAX_FILE_NAME_LEN];
+char           g_wav_special_sounds_file_name_list[NB_SPECIAL_SOUNDS * MAX_FILE_NAME_LEN];
 
 // Buffer in external RAM containing all the samples
-int16_t        DSY_SDRAM_BSS sample_data[MAX_WAV_DATA_SIZE_WORD];
+int16_t        DSY_SDRAM_BSS g_sample_data[MAX_WAV_DATA_SIZE_WORD];
 
 // Variable defining all the notes and special sounds. 
-TSoundData     sounds[NB_SOUNDS];
+TSoundData     g_sounds[NB_SOUNDS];
 
-// Variable defining the position of the first note in sample_data buffer.
+// Define if the pedal is up or down.
+bool g_pedal_up;               
+
+// Variable defining the position of the first note in g_sample_data buffer.
 // Notes are after special sounds. This variable does not depend on the 
 // program selected because special sounds have always the same size.
-size_t first_note_position;
+size_t g_first_note_position;
 
 /*************************************************************************************************
 * Local functions declaration
@@ -138,17 +139,17 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
     {
         sig_float = 0.0; // Initialize the signal value.
         
-        // Scan all the sounds of the sounds array.
+        // Scan all the sounds of the g_sounds array.
         for (size_t sound_idx = 0; sound_idx < NB_SOUNDS; sound_idx++)
         {
-            pCurSounds = &sounds[sound_idx];
+            pCurSounds = &g_sounds[sound_idx];
             
             if (pCurSounds->playing == true) // This sound is playing.
             {
                 // Compute the note signal taking into account: 
                 // - the polyphony factor (10 simulatenous notes at max volume without saturation).
                 // - the volume which depends on the attack time (key velocity).
-                note_sig_int16 = sample_data[pCurSounds->cur_playing_pos] / MAX_NB_SIMULTANEOUS_NOTES;
+                note_sig_int16 = g_sample_data[pCurSounds->cur_playing_pos] / MAX_NB_SIMULTANEOUS_NOTES;
                 note_sig_float = s162f(note_sig_int16);
                 note_sig_float *= pCurSounds->volume;
 
@@ -175,7 +176,7 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
                    At the end of the release the notes data are re-initialised. The release factor 
                    allows a more natural sound at key release (avoid a click sound).
                    It is a linear wav enveloppe applied at the note end. */
-                if (   ((pCurSounds->key_up == true) && (pedal_up == true))
+                if (   ((pCurSounds->key_up == true) && (g_pedal_up == true))
                     || (pCurSounds->sound_end_soon == true) )
                 {
                     // Take into account the position when the pedal or the key was up
@@ -237,20 +238,20 @@ static void AudioCallback(AudioHandle::InterleavingInputBuffer in,
 /* Initialise global variables */
 void initialize_global_variables(void)
 {
-    pedal_up = true;
+    g_pedal_up = true;
     
     // We consider that fields of type bool are false when set to 0.
-    memset(sounds, 0, sizeof(sounds));
+    memset(g_sounds, 0, sizeof(g_sounds));
     for (size_t idx = 0; idx < NB_SOUNDS; idx++)
     {
-        sounds[idx].key_up = true;
-        sounds[idx].volume = 0.0;
+        g_sounds[idx].key_up = true;
+        g_sounds[idx].volume = 0.0;
     }
-    memset(wav_notes_file_name_list, 0, sizeof(wav_notes_file_name_list));
+    memset(g_wav_notes_file_name_list, 0, sizeof(g_wav_notes_file_name_list));
     
     // Special sounds
-    memset(wav_special_sounds_file_name_list, 0, sizeof(wav_special_sounds_file_name_list));
-    strcpy(&wav_special_sounds_file_name_list[0], "ready.wav");
+    memset(g_wav_special_sounds_file_name_list, 0, sizeof(g_wav_special_sounds_file_name_list));
+    strcpy(&g_wav_special_sounds_file_name_list[0], "ready.wav");
 }
 
 /* Read the button controlling the programming mode (Jumper J7) */
@@ -288,7 +289,7 @@ void mount_sd_card(void)
 
     if (result != FR_OK)
     {
-        hw.PrintLine("f_mount result KO");
+        g_hw.PrintLine("f_mount result KO");
     }
 }
 
@@ -322,57 +323,57 @@ void build_notes_wav_notes_file_name_list(uint8_t prog_idx)
 
     // Build the search path
     build_notes_wav_file_path(prog_idx, search_path);
-    hw.PrintLine("search_path=%s", search_path);
+    g_hw.PrintLine("search_path=%s", search_path);
 
     // Open the directory containing the wav files.
-    hw.PrintLine("f_opendir");
+    g_hw.PrintLine("f_opendir");
     result = f_opendir(&dir, search_path);
     if (result != FR_OK)
     {
-       hw.PrintLine("f_opendir result KO. result=%d", result);
+       g_hw.PrintLine("f_opendir result KO. result=%d", result);
        return;
     }
     
     // Read directory element one by one.
     while (true)
     {
-        hw.PrintLine("f_readdir");
+        g_hw.PrintLine("f_readdir");
         result = f_readdir(&dir, &finf);
 
         if(result != FR_OK || finf.fname[0] == 0)
         {
-            hw.PrintLine("f_readdir KO. result=%d", result);
+            g_hw.PrintLine("f_readdir KO. result=%d", result);
             break;
         }
 
         // Skip element if its a directory or a hidden file.
         if(finf.fattrib & (AM_HID | AM_DIR))
         {
-            hw.PrintLine("Skip element");
+            g_hw.PrintLine("Skip element");
             continue;
         }
         
         // Check if its a wav file. If yes, add it to the list.
-        hw.PrintLine("finf.fname=%s", finf.fname);
+        g_hw.PrintLine("finf.fname=%s", finf.fname);
 
         if(strstr(finf.fname, ".wav") || strstr(finf.fname, ".WAV"))
         {
-            hw.PrintLine("Wav file found:%s", finf.fname);
+            g_hw.PrintLine("Wav file found:%s", finf.fname);
             
             // Compute the file index based on the 3 first characters of the file name
             strncpy(&index_str[0], &finf.fname[0], 3);
             file_index = atoi(index_str) - 1;
             
             // Copy the file name at the right file index
-            strcpy(&wav_notes_file_name_list[file_index * MAX_FILE_NAME_LEN], finf.fname);
+            strcpy(&g_wav_notes_file_name_list[file_index * MAX_FILE_NAME_LEN], finf.fname);
             
             nb_wav_files++;
-            hw.PrintLine("nb_wav_files=%ld", nb_wav_files);
+            g_hw.PrintLine("nb_wav_files=%ld", nb_wav_files);
         }
         
         if (nb_wav_files >= NB_KEYS)
         {
-            hw.PrintLine("Maximum number of files reached");
+            g_hw.PrintLine("Maximum number of files reached");
             break;
         }
 
@@ -380,7 +381,7 @@ void build_notes_wav_notes_file_name_list(uint8_t prog_idx)
 
     for (size_t idx=0; idx < NB_KEYS; idx++)
     {
-        hw.PrintLine("file_name=%s", &wav_notes_file_name_list[idx * MAX_FILE_NAME_LEN]);
+        g_hw.PrintLine("file_name=%s", &g_wav_notes_file_name_list[idx * MAX_FILE_NAME_LEN]);
     }
     
     f_closedir(&dir);
@@ -389,7 +390,7 @@ void build_notes_wav_notes_file_name_list(uint8_t prog_idx)
 /* Read and load the special wav file data in external RAM. 
    At the beginning of external RAM.
    Update the position where to load the first note in exernal RAM.
-   Update the sounds array fields first_sample_pos, last_sample_pos, nb_samples... */
+   Update the g_sounds array fields first_sample_pos, last_sample_pos, nb_samples... */
 void load_special_sounds_wav_files_in_ram(void)
 {
     size_t cur_sound_pos = 0;
@@ -401,16 +402,16 @@ void load_special_sounds_wav_files_in_ram(void)
     for (uint16_t sound_idx = 0; sound_idx < NB_SPECIAL_SOUNDS; sound_idx++)
     {
         // Current sound data
-        pCurSound = &sounds[sound_idx];
+        pCurSound = &g_sounds[sound_idx];
 
         // Build the full file path name
         strcpy(file_path_and_name, WAV_SPECIAL_SOUNDS_FILE_PATH);
         strcat(file_path_and_name, "/");
-        strcat(file_path_and_name, &wav_special_sounds_file_name_list[sound_idx * MAX_FILE_NAME_LEN]);
-        hw.PrintLine("file_path_and_name=%s", file_path_and_name);
+        strcat(file_path_and_name, &g_wav_special_sounds_file_name_list[sound_idx * MAX_FILE_NAME_LEN]);
+        g_hw.PrintLine("file_path_and_name=%s", file_path_and_name);
 
         // Load the wav data at the current sound position.
-        ram_address = (uint8_t*)(&sample_data[cur_sound_pos]);
+        ram_address = (uint8_t*)(&g_sample_data[cur_sound_pos]);
         wav_data_size_bytes = read_wav_file(file_path_and_name, ram_address);
 
         // For each sound record the position of the first sample, last sample and number of samples.
@@ -423,14 +424,14 @@ void load_special_sounds_wav_files_in_ram(void)
         pCurSound->key_up_pos      = pCurSound->first_sample_pos;
         pCurSound->pedal_up_pos    = pCurSound->first_sample_pos;
 
-        hw.PrintLine("Special sound start_position=%d nb_samples=%d", pCurSound->first_sample_pos, pCurSound->nb_samples);
+        g_hw.PrintLine("Special sound start_position=%d nb_samples=%d", pCurSound->first_sample_pos, pCurSound->nb_samples);
 
         // Compute the next note position.
         cur_sound_pos += pCurSound->nb_samples;
     }
     
-    // Update global variable first_note_position
-    first_note_position = cur_sound_pos;
+    // Update global variable g_first_note_position
+    g_first_note_position = cur_sound_pos;
 }
 
 /* Read and load the notes wav file data in external RAM. One file per note.
@@ -440,23 +441,23 @@ void load_notes_wav_files_in_ram(uint8_t prog_idx)
 {
     char file_path_and_name[MAX_FILE_PATH_LEN];
     size_t wav_data_size_bytes = 0;
-    size_t cur_note_pos = first_note_position;
+    size_t cur_note_pos = g_first_note_position;
     uint8_t* ram_address = NULL;
     TSoundData *pCurNote;
 
     for (uint16_t file_idx = 0; file_idx < NB_KEYS; file_idx++)
     {
         // Current note data
-        pCurNote = &sounds[NB_SPECIAL_SOUNDS + file_idx];
+        pCurNote = &g_sounds[NB_SPECIAL_SOUNDS + file_idx];
 
         // Build the full file path
         build_notes_wav_file_path(prog_idx, file_path_and_name);
         strcat(file_path_and_name, "/");
-        strcat(file_path_and_name, &wav_notes_file_name_list[file_idx * MAX_FILE_NAME_LEN]);
-        hw.PrintLine("file_path_and_name=%s", file_path_and_name);
+        strcat(file_path_and_name, &g_wav_notes_file_name_list[file_idx * MAX_FILE_NAME_LEN]);
+        g_hw.PrintLine("file_path_and_name=%s", file_path_and_name);
         
         // Load the wav data at the current note position.
-        ram_address = (uint8_t*)(&sample_data[cur_note_pos]);
+        ram_address = (uint8_t*)(&g_sample_data[cur_note_pos]);
         wav_data_size_bytes = read_wav_file(file_path_and_name, ram_address);
 
         // For each note record the position of the first sample, last sample and number of samples.
@@ -469,7 +470,7 @@ void load_notes_wav_files_in_ram(uint8_t prog_idx)
         pCurNote->key_up_pos      = pCurNote->first_sample_pos;
         pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
 
-        hw.PrintLine("Note start_position=%d nb_samples=%d", pCurNote->first_sample_pos, pCurNote->nb_samples);
+        g_hw.PrintLine("Note start_position=%d nb_samples=%d", pCurNote->first_sample_pos, pCurNote->nb_samples);
 
         // Compute the next note position.
         cur_note_pos += pCurNote->nb_samples;
@@ -514,8 +515,8 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
     int result = 0;
 
     // Wait for the start of the message (character 'S').
-    while(1) 
-    {
+    while(true) 
+    {   
         uart_result = p_uart->BlockingReceive(&char_rec, 1, 0);
         if ((uart_result == UartHandler::Result::OK) && (char_rec == 'S'))
         {
@@ -523,10 +524,10 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
         }
     }
 
-    // Receive characters until the end of message (character 0x0a).
-    while( (char_rec != 0x0a) || (char_idx == MAX_MESSAGE_SIZE))
+    // Receive characters until end of message (character 0x0a).
+    while(true)
     {
-        uart_result = p_uart->BlockingReceive(&char_rec, 1, 0);
+        uart_result = p_uart->BlockingReceive(&char_rec, 1, 1000); // Timeout = 1 sec
         if (uart_result == UartHandler::Result::OK)
         {
             msg_rec[char_idx] = char_rec;
@@ -534,16 +535,34 @@ int receive_msg_on_uart(UartHandler* p_uart, char msg_rec[MAX_MESSAGE_SIZE])
             {
                 char_idx++;
             }
+            else
+            {
+                g_hw.PrintLine("Error: Message received too long");
+                break;
+            }
         } 
-    }
+        else
+        {
+            g_hw.PrintLine("Error during message reception. uart_result=%d", uart_result);
+            break;
+        }
+
+        if (char_rec == 0x0a)
+        {
+            g_hw.PrintLine("End of message received");
+            break;
+        } 
     
-    if (char_idx == MAX_MESSAGE_SIZE)
+    } // while(true)
+   
+    if ( (char_idx >= MAX_MESSAGE_SIZE) || (uart_result != UartHandler::Result::OK)) 
     {
-        hw.PrintLine("Error: Message too long received");
         result = -1;
     }
     
     msg_rec[char_idx] = 0; // Null terminated string
+
+    g_hw.PrintLine("End receive_msg_on_uart. result=%d char_idx=%d msg_rec=%s", result, char_idx, msg_rec);
 
     return result;
 }
@@ -573,7 +592,7 @@ int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, 
         key_index = temp_int;
         if (result_2 != 1)
         {
-            hw.PrintLine("Error: Problem to convert key_index received");
+            g_hw.PrintLine("Error: Problem to convert key_index received");
             result = -1;
         }
         *p_key_index = arduino_to_piano_key_index(key_index);
@@ -584,7 +603,7 @@ int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, 
         result_2 = sscanf(temp_str, "%ld", &time);
         if (result_2 != 1)
         {
-            hw.PrintLine("Error: Problem to convert time received");
+            g_hw.PrintLine("Error: Problem to convert time received");
             result = -1;
         }
         *p_time = time;
@@ -601,14 +620,14 @@ int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, 
         key_index = temp_int;
         if (result_2 != 1)
         {
-            hw.PrintLine("Error: Problem to convert key_index received");
+            g_hw.PrintLine("Error: Problem to convert key_index received");
             result = -1;
         }
         *p_key_index = arduino_to_piano_key_index(key_index);
     }
     else
     {
-        hw.PrintLine("Error: Unknown message received");
+        g_hw.PrintLine("Error: Unknown message received");
         result = -1;
     }
 
@@ -629,15 +648,15 @@ void manage_msg_received_in_normal_mode(uint16_t key_index, e_msg_type msg_type,
     if (key_index != PEDAL_KEY_IDX)
     {
         // A key from the keyboard has changed state.
-        pCurNote = &sounds[NB_SPECIAL_SOUNDS + key_index];
+        pCurNote = &g_sounds[NB_SPECIAL_SOUNDS + key_index];
         
         if (msg_type == KEY_DOWN_MSG) 
         {
             // The key is down
-            hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
+            g_hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
 
             pCurNote->volume = compute_volume(attack_time);
-            hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
+            g_hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
 
             pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
             pCurNote->key_up_pos      = pCurNote->first_sample_pos;
@@ -652,7 +671,7 @@ void manage_msg_received_in_normal_mode(uint16_t key_index, e_msg_type msg_type,
         else if (msg_type == KEY_UP_MSG) 
         {
             // The key is up
-            hw.PrintLine("KEY_UP index=%d", key_index);
+            g_hw.PrintLine("KEY_UP index=%d", key_index);
             
             pCurNote->key_up_pos = pCurNote->cur_playing_pos;
             pCurNote->key_up = true;
@@ -664,27 +683,27 @@ void manage_msg_received_in_normal_mode(uint16_t key_index, e_msg_type msg_type,
         if (msg_type == KEY_DOWN_MSG) 
         {
             // The pedal is down
-            hw.PrintLine("PEDAL_DOWN");
-            pedal_up = false;
+            g_hw.PrintLine("PEDAL_DOWN");
+            g_pedal_up = false;
             
             // The position is reinitialised for all notes (different position for ech note).
             for (idx = 0; idx < NB_KEYS; idx++)
             {
-                sounds[NB_SPECIAL_SOUNDS + idx].pedal_up_pos = sounds[NB_SPECIAL_SOUNDS + idx].first_sample_pos;
+                g_sounds[NB_SPECIAL_SOUNDS + idx].pedal_up_pos = g_sounds[NB_SPECIAL_SOUNDS + idx].first_sample_pos;
             }
         } 
         else if (msg_type == KEY_UP_MSG) 
         {
             // The pedal is up
-            hw.PrintLine("PEDAL_UP");
+            g_hw.PrintLine("PEDAL_UP");
 
             // The position when the pedal is up is set for all notes (different positions for 
             // each note).
             for (idx = 0; idx < NB_KEYS; idx++)
             {
-                sounds[NB_SPECIAL_SOUNDS + idx].pedal_up_pos = sounds[NB_SPECIAL_SOUNDS + idx].cur_playing_pos;
+                g_sounds[NB_SPECIAL_SOUNDS + idx].pedal_up_pos = g_sounds[NB_SPECIAL_SOUNDS + idx].cur_playing_pos;
             }
-            pedal_up = true;
+            g_pedal_up = true;
         }
     }
 }
@@ -698,31 +717,31 @@ void manage_msg_received_in_programming_mode(uint16_t key_index, e_msg_type msg_
 {
     uint8_t prog_index;
 
-    if (msg_type == KEY_DOWN_MSG) 
+    if (msg_type == KEY_UP_MSG) 
     {
-        hw.PrintLine("Programming mode");
+        g_hw.PrintLine("Programming mode");
         prog_index = (key_index % 2) + 1;
-        hw.PrintLine("Program index selected=%d", prog_index);
+        g_hw.PrintLine("Program index selected=%d", prog_index);
 
-        hw.PrintLine("Writing program index on SD card...");
+        g_hw.PrintLine("Writing program index on SD card...");
         write_current_program(prog_index);
 
         // Build a sorted list of wav file name (one per note).
-        /*hw.PrintLine("Building the list of wav files...");
+        g_hw.PrintLine("Building the list of wav files...");
         toggle_right_led();
         build_notes_wav_notes_file_name_list(prog_index);
 
         // Read notes wav files and load them in RAM.
-        hw.PrintLine("Loading notes wav files in RAM...");
+        g_hw.PrintLine("Loading notes wav files in RAM...");
         toggle_right_led();
-        load_notes_wav_files_in_ram(prog_index);*/
+        load_notes_wav_files_in_ram(prog_index);
     }
 }
 
 /* Play a special sound */
 void play_special_sound(uint8_t sound_idx)
 {
-    TSoundData *pCurSound = &sounds[sound_idx];
+    TSoundData *pCurSound = &g_sounds[sound_idx];
 
     pCurSound->volume          = 1.0f;
     pCurSound->cur_playing_pos = pCurSound->first_sample_pos;
@@ -804,13 +823,13 @@ size_t read_wav_file(char *file_name, uint8_t* ram_address)
         result = f_read(&SDFile, (void *)&wav_file_info.raw_data, sizeof(WAV_FormatTypeDef), &bytesRead);
         if (result != FR_OK)
         {
-            hw.PrintLine("f_read result KO. result=%d", result);
+            g_hw.PrintLine("f_read result KO. result=%d", result);
         }
         f_close(&SDFile);
     }
     else
     {
-        hw.PrintLine("f_open result KO. result=%d", result);
+        g_hw.PrintLine("f_open result KO. result=%d", result);
     }
 
     // Read wav file data
@@ -826,7 +845,7 @@ size_t read_wav_file(char *file_name, uint8_t* ram_address)
         result = f_read(&SDFile, ram_address, file_size - size_to_skip, &bytesRead);
         if (result != FR_OK)
         {
-            hw.PrintLine("f_read result KO. result=%d", result);
+            g_hw.PrintLine("f_read result KO. result=%d", result);
         }
     
         f_close(&SDFile);
@@ -835,7 +854,7 @@ size_t read_wav_file(char *file_name, uint8_t* ram_address)
     }
     else
     {
-        hw.PrintLine("f_open result KO. result=%d", result);
+        g_hw.PrintLine("f_open result KO. result=%d", result);
     }
 
     return(wav_data_size);
@@ -912,23 +931,23 @@ void toggle_right_led(void)
     
     led_state = !led_state;
 
-    hw.SetLed(led_state);
+    g_hw.SetLed(led_state);
 }
 
 /* Display data of a note. Useful for debugging.
    Positions are displayed relatively to the first position.*/
 void display_sound_data(uint16_t idx) 
 {
-    size_t first_pos = sounds[idx].first_sample_pos;
+    size_t first_pos = g_sounds[idx].first_sample_pos;
 
-    hw.Print("idx=%d ", idx);
-    hw.Print("playing=%d ", sounds[idx].playing);
-    hw.Print("key_up=%d ", sounds[idx].key_up);
-    // hw.Print("first_pos=%d ", sounds[idx].first_sample_pos);
-    hw.Print("last_pos=%d ", sounds[idx].last_sample_pos - first_pos);
-    hw.Print("cur_pos=%d ", sounds[idx].cur_playing_pos - first_pos);
-    hw.Print("kup_pos=%d ", sounds[idx].key_up_pos - first_pos);
-    hw.PrintLine("pup_pos=%d", sounds[idx].pedal_up_pos - first_pos);
+    g_hw.Print("idx=%d ", idx);
+    g_hw.Print("playing=%d ", g_sounds[idx].playing);
+    g_hw.Print("key_up=%d ", g_sounds[idx].key_up);
+    // g_hw.Print("first_pos=%d ", g_sounds[idx].first_sample_pos);
+    g_hw.Print("last_pos=%d ", g_sounds[idx].last_sample_pos - first_pos);
+    g_hw.Print("cur_pos=%d ", g_sounds[idx].cur_playing_pos - first_pos);
+    g_hw.Print("kup_pos=%d ", g_sounds[idx].key_up_pos - first_pos);
+    g_hw.PrintLine("pup_pos=%d", g_sounds[idx].pedal_up_pos - first_pos);
 }
 
 /* Display data of all sounds. Useful for debugging.
@@ -956,24 +975,24 @@ void write_current_program(uint8_t prog_idx)
         result = f_write(&SDFile, &byte_to_write, 1, &nb_bytes_written);
         if ((result != FR_OK) || (nb_bytes_written != 1))
         {
-            hw.PrintLine("f_write result KO. result=%d nb_bytes_written=%d", result, nb_bytes_written);
+            g_hw.PrintLine("f_write result KO. result=%d nb_bytes_written=%d", result, nb_bytes_written);
         } 
         
         result = f_sync(&SDFile);
         if (result != FR_OK)
         {
-            hw.PrintLine("f_sync result KO. result=%d", result);
+            g_hw.PrintLine("f_sync result KO. result=%d", result);
         }
 
         result = f_close(&SDFile);
         if (result != FR_OK)
         {
-            hw.PrintLine("f_close result KO. result=%d", result);
+            g_hw.PrintLine("f_close result KO. result=%d", result);
         }
     }
     else
     {
-        hw.PrintLine("f_open result KO. result=%d", result);
+        g_hw.PrintLine("f_open result KO. result=%d", result);
     }
 }
 
@@ -998,18 +1017,18 @@ uint8_t read_current_program(void)
         } 
         else
         {
-            hw.PrintLine("f_read result KO. result=%d nb_bytes_read=%d", result, nb_bytes_read);    
+            g_hw.PrintLine("f_read result KO. result=%d nb_bytes_read=%d", result, nb_bytes_read);    
         }
 
         result = f_close(&SDFile);
         if (result != FR_OK)
         {
-            hw.PrintLine("f_close result KO. result=%d", result);
+            g_hw.PrintLine("f_close result KO. result=%d", result);
         }
     }
     else
     {
-        hw.PrintLine("f_open result KO. result=%d", result);
+        g_hw.PrintLine("f_open result KO. result=%d", result);
     }
 
     return cur_prog_idx;
@@ -1018,66 +1037,66 @@ uint8_t read_current_program(void)
 /* Main program */
 int main(void)
 {
-    UartHandler uart;
+    static UartHandler uart;
     uint8_t cur_prog_idx;
 
     // Initialise global variables
     initialize_global_variables();
 
     // Initialise hardware
-    hw.Init();
+    g_hw.Init();
     toggle_right_led();
 
     // Initialise serial log.
     // Set parameter to true to wait for the serial line connection.
-    hw.StartLog(false);
+    g_hw.StartLog(false);
     toggle_right_led();
 
     // Initialise and mount the SD card
-    hw.PrintLine("Mounting SD card...");
+    g_hw.PrintLine("Mounting SD card...");
     toggle_right_led();
     mount_sd_card();
 
     // Read current prog
-    hw.PrintLine("Read current prog...");
+    g_hw.PrintLine("Read current prog...");
     cur_prog_idx = read_current_program();
-    hw.PrintLine("cur_prog_idx=%d", cur_prog_idx);
+    g_hw.PrintLine("cur_prog_idx=%d", cur_prog_idx);
 
     // Read special wav files and load them in RAM.
-    hw.PrintLine("Loading special wav files in RAM...");
+    g_hw.PrintLine("Loading special wav files in RAM...");
     toggle_right_led();
     load_special_sounds_wav_files_in_ram();
 
     // Build a sorted list of wav file name (one per note).
-    hw.PrintLine("Building the list of wav files...");
+    g_hw.PrintLine("Building the list of wav files...");
     toggle_right_led();
     build_notes_wav_notes_file_name_list(cur_prog_idx);
 
     // Read notes wav files and load them in RAM.
-    hw.PrintLine("Loading notes wav files in RAM...");
+    g_hw.PrintLine("Loading notes wav files in RAM...");
     toggle_right_led();
     load_notes_wav_files_in_ram(cur_prog_idx);
 
     // Initialize UART
-    hw.PrintLine("Initializing UART...");
+    g_hw.PrintLine("Initializing UART...");
     toggle_right_led();
     initialize_uart(&uart);
     flush_uart(&uart);
 
 	// Prepare and start the audio call back
-    hw.PrintLine("Preparing and starting audio call back...");
+    g_hw.PrintLine("Preparing and starting audio call back...");
     toggle_right_led();
-    hw.SetAudioBlockSize(4); // number of samples handled per callback
-	hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
-	hw.StartAudio(AudioCallback);
+    g_hw.SetAudioBlockSize(4); // number of samples handled per callback
+	g_hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
+	g_hw.StartAudio(AudioCallback);
     
     // Play the sound ready.
-    hw.PrintLine("Play the sound ready...");
+    g_hw.PrintLine("Play the sound ready...");
     toggle_right_led();
     play_special_sound(SOUND_READY_IDX);
 
     // Play notes received from arduino.
-    hw.PrintLine("Playing notes received from arduino...");
+    g_hw.PrintLine("Playing notes received from arduino...");
     toggle_right_led();
     play_notes_received_from_arduino(&uart);
 
