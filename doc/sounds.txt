@@ -1,0 +1,14 @@
+In directory audio_samples, we have:
+
+- The directory freesound_25405__tedagame__88-piano-keys-long-reverb contains the wav files 
+for the 88 keys of a piano in archive wav_sorted_nico.zip.
+The original files are OGG files coming from the web site https://freesound.org. 
+OGG files have been converted in WAV and then ordered thanks to a script and to Nicolas.
+
+- The directory sampler_box_GrandPiano contains the wav files for the 88 keys of a piano 
+in archive velocity_16_all_notes_mono_remove_end_renamed_for_sd_card.zip.
+Original WAV files comes from the site samplerbox.org. 
+The original WAV files are in stereo, with different velocity (from v1 to v16) and only one note 
+over 3 are recorded (only notes C, D#, F# and A). I choose velocity 16 and built the missing notes 
+with an audacity macro. Then I renamed the notes with a python script. Then I convert the wav in mono and I cut the end with an audacity macro.
+Doing so, the total size is around 50 MB and can fit in 64 MB RAM memory of the daisyseed.
