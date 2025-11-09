@@ -1,7 +1,7 @@
 **** TODO ****
-- Add a second bank of wav sounds.
 - Install at Bôches
-- Add modes with generated sounds.
+- Add mode with generated sounds.
+- Add mode demo that reads a midi file.
 
 **** Install at Bôches ****
 - Make/Connect 2 flat cables main board <->Satellite boards
