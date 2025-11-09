@@ -2,7 +2,7 @@
 TARGET = play_notes_from_arduino
 
 # Sources
-CPP_SOURCES = play_notes_from_arduino.cpp
+CPP_SOURCES = play_notes_from_arduino.cpp common.cpp play_midi_files.cpp
 
 # Library Locations
 LIBDAISY_DIR = ../../../daisy_seed/libDaisy/
