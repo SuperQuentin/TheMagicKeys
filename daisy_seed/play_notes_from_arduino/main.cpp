@@ -725,7 +725,7 @@ void manage_msg_received_in_programming_mode(uint16_t key_index, e_msg_type msg_
         if (demo_mode == true)
         {
             g_hw.PrintLine("Play midi file...");
-            play_one_midi_file(0, 26);
+            play_one_midi_file(0, 1, 26);
         }
 
         // Play sound "Piano ready"
@@ -1086,7 +1086,7 @@ int main(void)
     if (demo_mode == true)
     {
         g_hw.PrintLine("Play midi file...");
-        play_one_midi_file(0, 26);
+        play_one_midi_file(0, 1, 26);
     }
 
     // Play the sound "Piano ready".

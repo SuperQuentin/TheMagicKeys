@@ -186,10 +186,9 @@ void midi_decode_var_length_param(uint8_t* data, uint32_t* value, uint8_t* len)
 }
 
 /* Parse the MIDI file from RAM and play the notes. 
-   if nb_notes_to_play > 0, play only a certain number of notes of the first track. 
-   Otherwise play the file until the end. 
+Play the number of tracks and notes desired.
 */
-void play_midi_file_from_ram(int32_t nb_notes_to_play)
+void play_midi_file_from_ram(uint16_t nb_tracks_to_play, uint32_t nb_notes_to_play)
 {
     uint32_t tempo = 500; //[millisec / quarter_note]
     uint8_t shift_notes = 24;
@@ -217,6 +216,7 @@ void play_midi_file_from_ram(int32_t nb_notes_to_play)
     uint8_t key_idx;
     uint8_t velocity;
     uint32_t note_counter;
+    uint16_t track_counter;
     bool stop_playing;
 
     // Header
@@ -244,8 +244,14 @@ void play_midi_file_from_ram(int32_t nb_notes_to_play)
 
     // Parsing of tracks.
     stop_playing = false;
+    track_counter = 0;
     while(!stop_playing)
     {
+        if (track_counter > nb_tracks_to_play)
+        {
+            stop_playing = true;
+        }
+
         if (memcmp(&g_midi_file_data[idx], "MTrk", 4) != 0)
         {
             g_hw.PrintLine("End of all tracks");
@@ -264,6 +270,11 @@ void play_midi_file_from_ram(int32_t nb_notes_to_play)
         note_counter = 0;
         while(!stop_playing)
         {
+            if (note_counter >= nb_notes_to_play)
+            {
+                stop_playing = true;
+            }
+
             // v_time
             midi_decode_var_length_param(&g_midi_file_data[idx], &value, &len);
             g_hw.PrintLine("v_time=%d, len=%d", value, len);
@@ -410,12 +421,8 @@ void play_midi_file_from_ram(int32_t nb_notes_to_play)
             if (idx - start_track_idx >= track_len)
             {
                 g_hw.PrintLine("End of a track");
+                track_counter++;
                 break; // End of a track
-            }
-
-            if ((nb_notes_to_play >= 0) && (note_counter >= (uint32_t)nb_notes_to_play))
-            {
-                stop_playing = true;
             }
 
         } // while(!stop_playing) -> End of a track
@@ -424,9 +431,10 @@ void play_midi_file_from_ram(int32_t nb_notes_to_play)
 }
 
 /* Play one midi file at the given index in the list. 
-   if nb_notes_to_play > 0, play only a certain number of notes. 
-   Otherwise play the file until the end. */
-void play_one_midi_file(uint8_t file_idx, int32_t nb_notes_to_play)
+   Play the number of tracks and notes desired.
+*/
+void play_one_midi_file(uint8_t file_idx, uint16_t nb_tracks_to_play, 
+                        uint32_t nb_notes_to_play)
 {
     // Build a list of midi file name to play.
     g_hw.PrintLine("Building the list of MIDI files...");
@@ -438,7 +446,7 @@ void play_one_midi_file(uint8_t file_idx, int32_t nb_notes_to_play)
     load_midi_file_in_ram(file_idx);
 
     g_hw.PrintLine("Play a MIDI file...");
-    play_midi_file_from_ram(nb_notes_to_play);
+    play_midi_file_from_ram(nb_tracks_to_play, nb_notes_to_play);
 }
 
 /* Play all the midi files */
@@ -456,6 +464,6 @@ void play_all_midi_files(void)
         load_midi_file_in_ram(file_idx);
 
         g_hw.PrintLine("Play a MIDI file...");
-        play_midi_file_from_ram(PLAY_MIDI_FILE_UNTIL_END);
+        play_midi_file_from_ram(PLAY_ALL_TRACKS, PLAY_ALL_NOTES);
     }
 }
