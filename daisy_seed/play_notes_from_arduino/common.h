@@ -63,5 +63,7 @@ extern TSoundData     g_sounds[NB_SOUNDS];
 * Functions 
 *************************************************************************************************/
 extern void toggle_right_led(void);
+extern void start_playing_a_note(uint16_t key_index, float amplification);
+extern void stop_playing_a_note(uint16_t key_index);
 
 #endif //#ifndef COMMON

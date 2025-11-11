@@ -18,6 +18,7 @@
 #include "fatfs.h"
 #include "common.h"
 #include "play_midi_files.h"
+#include <stdlib.h>
 
 using namespace daisy;
 using namespace daisy::seed;
@@ -623,33 +624,22 @@ int analyze_msg_received(char msg_rec[MAX_MESSAGE_SIZE], uint16_t *p_key_index, 
 */
 void manage_msg_received_in_normal_mode(uint16_t key_index, e_msg_type msg_type, uint32_t attack_time)
 {
-    TSoundData *pCurNote;
     uint16_t idx;
     
     if (key_index != PEDAL_KEY_IDX)
     {
         // A key from the keyboard has changed state.
-        pCurNote = &g_sounds[NB_SPECIAL_SOUNDS + key_index];
-        
         if (msg_type == KEY_DOWN_MSG) 
         {
             // The key is down
-            pCurNote->volume = compute_volume(attack_time);
+            float amplification = compute_volume(attack_time);
 
             #if (ENABLED_ALL_LOGS == 1)
                 g_hw.Print("KEY_DOWN index=%d attack_time=%ld", key_index, attack_time);
-                g_hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(pCurNote->volume));
+                g_hw.PrintLine(" volume="FLT_FMT3, FLT_VAR3(amplification));
             #endif
 
-            pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
-            pCurNote->key_up_pos      = pCurNote->first_sample_pos;
-            pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
-            pCurNote->key_up          = false;
-            pCurNote->sound_end_soon  = false;
-
-            // Start the note playing by the AudioCallback function.
-            pCurNote->playing = true;
-
+            start_playing_a_note(key_index, amplification);
         } 
         else if (msg_type == KEY_UP_MSG) 
         {
@@ -657,9 +647,8 @@ void manage_msg_received_in_normal_mode(uint16_t key_index, e_msg_type msg_type,
             #if (ENABLED_ALL_LOGS == 1)
                 g_hw.PrintLine("KEY_UP index=%d", key_index);
             #endif
-           
-            pCurNote->key_up_pos = pCurNote->cur_playing_pos;
-            pCurNote->key_up = true;
+
+            stop_playing_a_note(key_index);
         }
     } 
     else // key_index == PEDAL_KEY_IDX
@@ -735,8 +724,8 @@ void manage_msg_received_in_programming_mode(uint16_t key_index, e_msg_type msg_
         // Play all midi files in demo mode
         if (demo_mode == true)
         {
-            g_hw.PrintLine("Play all midi files...");
-            play_all_midi_files();
+            g_hw.PrintLine("Play midi file...");
+            play_one_midi_file(0, 26);
         }
 
         // Play sound "Piano ready"
@@ -1093,11 +1082,11 @@ int main(void)
 	g_hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 	g_hw.StartAudio(AudioCallback);
 
-    // Play all midi files in demo mode
+    // Demo mode-> Play some notes of a midi file 
     if (demo_mode == true)
     {
-        g_hw.PrintLine("Play all midi files...");
-        play_all_midi_files();
+        g_hw.PrintLine("Play midi file...");
+        play_one_midi_file(0, 26);
     }
 
     // Play the sound "Piano ready".

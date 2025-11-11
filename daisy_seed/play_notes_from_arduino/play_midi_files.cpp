@@ -7,6 +7,7 @@
 *************************************************************************************************/
 #include "daisy_seed.h"
 #include "common.h"
+#include "play_midi_files.h"
 
 using namespace daisy;
 using namespace daisy::seed;
@@ -184,8 +185,11 @@ void midi_decode_var_length_param(uint8_t* data, uint32_t* value, uint8_t* len)
     *value = ret_value;
 }
 
-// Parse the MIDI file from RAM and play the notes.
-void play_midi_file_from_ram(void)
+/* Parse the MIDI file from RAM and play the notes. 
+   if nb_notes_to_play > 0, play only a certain number of notes of the first track. 
+   Otherwise play the file until the end. 
+*/
+void play_midi_file_from_ram(int32_t nb_notes_to_play)
 {
     uint32_t tempo = 500; //[millisec / quarter_note]
     uint8_t shift_notes = 24;
@@ -212,8 +216,8 @@ void play_midi_file_from_ram(void)
     uint32_t time_ms;
     uint8_t key_idx;
     uint8_t velocity;
-    TSoundData* pCurNote = NULL;
     uint32_t note_counter;
+    bool stop_playing;
 
     // Header
     g_hw.PrintLine("** HEADER **");
@@ -239,7 +243,8 @@ void play_midi_file_from_ram(void)
     idx += 14;
 
     // Parsing of tracks.
-    while(true)
+    stop_playing = false;
+    while(!stop_playing)
     {
         if (memcmp(&g_midi_file_data[idx], "MTrk", 4) != 0)
         {
@@ -257,14 +262,8 @@ void play_midi_file_from_ram(void)
         // Parsing of one track.
         start_track_idx = idx;
         note_counter = 0;
-        while(true)
+        while(!stop_playing)
         {
-            // For testing only
-            if (note_counter > 30)
-            {
-                break;
-            }
-
             // v_time
             midi_decode_var_length_param(&g_midi_file_data[idx], &value, &len);
             g_hw.PrintLine("v_time=%d, len=%d", value, len);
@@ -393,27 +392,16 @@ void play_midi_file_from_ram(void)
                     }
 
                     velocity = data_byte_2;
-                    pCurNote = &g_sounds[NB_SPECIAL_SOUNDS + key_idx];
                     
                     if (velocity != 0)
                     {
                         note_counter++;
-
-                        pCurNote->volume = 1.0;
-
-                        pCurNote->cur_playing_pos = pCurNote->first_sample_pos;
-                        pCurNote->key_up_pos      = pCurNote->first_sample_pos;
-                        pCurNote->pedal_up_pos    = pCurNote->first_sample_pos;
-                        pCurNote->key_up          = false;
-                        pCurNote->sound_end_soon  = false;
-
-                        // Start the note playing by the AudioCallback function.
-                        pCurNote->playing = true;
+                        // We consider that velocity = 80 corresponds to max amplification (= 1.0).
+                        start_playing_a_note(key_idx, velocity / 80.0);
                     }
                     else
                     {
-                        pCurNote->key_up_pos = pCurNote->cur_playing_pos;
-                        pCurNote->key_up = true;
+                        stop_playing_a_note(key_idx);
                     }
                 }
             
@@ -424,9 +412,33 @@ void play_midi_file_from_ram(void)
                 g_hw.PrintLine("End of a track");
                 break; // End of a track
             }
-        } // while(true) -> End of a track
 
-    } // while(true) -> End of tracks
+            if ((nb_notes_to_play >= 0) && (note_counter >= (uint32_t)nb_notes_to_play))
+            {
+                stop_playing = true;
+            }
+
+        } // while(!stop_playing) -> End of a track
+
+    } // while(!stop_playing) -> End of tracks
+}
+
+/* Play one midi file at the given index in the list. 
+   if nb_notes_to_play > 0, play only a certain number of notes. 
+   Otherwise play the file until the end. */
+void play_one_midi_file(uint8_t file_idx, int32_t nb_notes_to_play)
+{
+    // Build a list of midi file name to play.
+    g_hw.PrintLine("Building the list of MIDI files...");
+    toggle_right_led();
+    build_midi_file_name_list();
+
+    g_hw.PrintLine("Load a MIDI file in RAM...");
+    toggle_right_led();
+    load_midi_file_in_ram(file_idx);
+
+    g_hw.PrintLine("Play a MIDI file...");
+    play_midi_file_from_ram(nb_notes_to_play);
 }
 
 /* Play all the midi files */
@@ -444,6 +456,6 @@ void play_all_midi_files(void)
         load_midi_file_in_ram(file_idx);
 
         g_hw.PrintLine("Play a MIDI file...");
-        play_midi_file_from_ram();
+        play_midi_file_from_ram(PLAY_MIDI_FILE_UNTIL_END);
     }
 }
