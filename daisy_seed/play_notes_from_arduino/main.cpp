@@ -701,7 +701,7 @@ void manage_msg_received_in_programming_mode(uint16_t key_index, e_msg_type msg_
 
         // Compute program index and save it on SD card
         g_hw.PrintLine("Programming mode");
-        prog_index = key_index  % NB_PROGRAMS;
+        prog_index = key_index % NB_PROGRAMS;
         g_hw.PrintLine("Program index selected=%d", prog_index);
         
         g_hw.PrintLine("Writing program index on SD card...");

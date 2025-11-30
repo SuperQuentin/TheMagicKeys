@@ -1,10 +1,8 @@
 **** TODO ****
-- Install at Bôches
+- Generate all notes from A0 to A7 instead of C1 to C8.
+- Add mode demo that reads the entire midi file.
+- Add new sounds banks: Mellotron....
 - Add mode with generated sounds.
-- Add mode demo that reads a midi file.
-
-**** Install at Bôches ****
-- Make/Connect 2 flat cables main board <->Satellite boards
-- Connect the 2 pedals.
-- Connect key number 85.
-
+- Study volume computation. Nicolas thinks the linear rule is not the best.
+- Grand piano: Propose mode with velociy 8 instead of 16.
+- Make release time depending on the note.
