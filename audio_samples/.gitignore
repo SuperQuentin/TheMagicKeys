@@ -1,0 +1,5 @@
+# Ignore everything except .gitignore and directory generate_piano_samples.
+/*
+!.gitignore
+!generate_piano_samples/
+!generate_piano_samples/**

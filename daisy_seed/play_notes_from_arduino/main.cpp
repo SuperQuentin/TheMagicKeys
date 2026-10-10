@@ -364,9 +364,8 @@ void build_notes_wav_notes_file_name_list(uint8_t sound_bank_idx)
     f_closedir(&dir);
 }
 
-/* Read and load the special wav file data in external RAM. 
-   At the beginning of external RAM.
-   Update the position where to load the first note in exernal RAM.
+/* Read and load the special wav file data at the beginning of external RAM.
+   Update the position where to load the first note in external RAM.
    Update the g_sounds array fields first_sample_pos, last_sample_pos, nb_samples... */
 void load_special_sounds_wav_files_in_ram(void)
 {

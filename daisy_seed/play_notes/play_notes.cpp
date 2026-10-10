@@ -31,7 +31,7 @@ using namespace daisy;
 // Wav files on the SD card
 #define MAX_FILE_NAME_LEN 40
 #define MAX_FILE_PATH_LEN 200
-#define WAV_FILE_PATH "/piano_wav/current"
+#define WAV_FILE_PATH "/piano_wav/bank_3"
 #define MAX_WAV_DATA_SIZE_BYTES (60*1000*1000)
 #define MAX_WAV_DATA_SIZE_WORD (MAX_WAV_DATA_SIZE_BYTES / 2)
 
@@ -381,38 +381,40 @@ int main(void)
     
     // Play all notes one by one (the range).
     hw.PrintLine("Play all notes one by one at different speed...");
-    uint32_t time_ms = 32;
+    #define DELAY_MIN_MS 32
+    #define DELAY_MAX_MS 128
+    uint32_t delay_ms = DELAY_MIN_MS;
     bool down = false;
     do
     {    
         for (size_t idx = 0; idx < NB_KEYS; idx++)
         {
-            hw.PrintLine("Index of note playing=%d time_ms=%d", idx, time_ms);
+            hw.PrintLine("Index of note playing=%d delay_ms=%d", idx, delay_ms);
 
             notes[idx].playing = true;
     
-            System::Delay(time_ms);
+            System::Delay(delay_ms);
 
             notes[idx].released = true;
 
             notes[idx].release_pos = notes[idx].cur_playing_pos;
 
-            System::Delay(time_ms);
+            System::Delay(delay_ms);
         }
         
         // Change of speed
         if (down == true)
         {
-            time_ms /= 2;
-            if (time_ms <= 32)
+            delay_ms /= 2;
+            if (delay_ms <= DELAY_MIN_MS)
             {
                 down = false;
             }
         } 
         else
         {
-            time_ms *= 2;
-            if (time_ms >= 16384)
+            delay_ms *= 2;
+            if (delay_ms >= DELAY_MAX_MS)
             {
                 down = true;
             }

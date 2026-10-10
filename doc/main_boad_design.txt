@@ -58,5 +58,7 @@ sample_rate = 0xAC00 = 44'100 Hz
 bits_per_sample = 16
 data_size = 0x298400 = 2'720'768
 
-
-
+**** SD card directories and files ****
+/piano_wav/bank_<N> -> Directory containing the notes (wav files) for the program index N. 
+/piano_wav/current_prog -> File that stores the current program index.
+/piano_wav/special -> Directories conatining special wav sounds.

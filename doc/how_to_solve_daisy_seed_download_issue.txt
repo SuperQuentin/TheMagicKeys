@@ -1,0 +1,5 @@
+- Run Zadig.exe (archived in daisy_seed/tools).
+- Select Options/List All Devices
+- Select daisy seed device
+- Choose driver: WinUSB
+- Replace driver

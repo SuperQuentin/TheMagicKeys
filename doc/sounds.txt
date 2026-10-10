@@ -12,3 +12,5 @@ The original WAV files are in stereo, with different velocity (from v1 to v16) a
 over 3 are recorded (only notes C, D#, F# and A). I choose velocity 16 and built the missing notes 
 with an audacity macro. Then I renamed the notes with a python script. Then I convert the wav in mono and I cut the end with an audacity macro.
 Doing so, the total size is around 50 MB and can fit in 64 MB RAM memory of the daisyseed.
+
+- The special sounds as ready.wav.
